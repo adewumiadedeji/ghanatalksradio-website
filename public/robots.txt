@@ -1,0 +1,4 @@
+Sitemap: https://ghanatalksradio.com/sitemap-index.xml
+
+User-agent: *
+Allow: /

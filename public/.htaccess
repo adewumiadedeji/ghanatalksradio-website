@@ -1,0 +1,42 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+    # Required on the IONOS deployment (~/GTR-Laravel-New): without an
+    # explicit base, mod_rewrite auto-detects it from the .htaccess file's
+    # filesystem path, which breaks on this account's symlinked docroot
+    # structure (/homepages/... is itself a symlink to /kunden/homepages/...)
+    # - every non-root route 500'd until this was added. Harmless/no-op on
+    # a normal single-path docroot, so safe to keep everywhere.
+    RewriteBase /
+
+    # Canonicalize to the non-www host (matches config('app.url') and the
+    # sitemap). www.ghanatalksradio.com and ghanatalksradio.com were both
+    # serving identical content with no redirect between them, so every
+    # page had two "different", equally self-canonical URLs in Google's
+    # eyes - splitting ranking signals for the same content across two
+    # hosts. Confirmed live: the same post's canonical/og:url tag differed
+    # depending only on which host served the request.
+    RewriteCond %{HTTP_HOST} ^www\.ghanatalksradio\.com$ [NC]
+    RewriteRule ^ https://ghanatalksradio.com%{REQUEST_URI} [L,R=301]
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
