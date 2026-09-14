@@ -5,7 +5,7 @@ import { PodcastEpisodeList } from '../components/PodcastEpisodeList';
 import { Pagination } from '../components/Pagination';
 import { AdSlot, GTR_AD_SLOTS } from '../components/AdSlot';
 
-interface PodcastProps {
+export interface PodcastProps {
   episodes: PodcastEpisode[];
   page: number;
   hasMore: boolean;

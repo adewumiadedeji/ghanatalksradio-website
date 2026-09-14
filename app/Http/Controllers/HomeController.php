@@ -28,9 +28,11 @@ class HomeController extends Controller
 
     private const LIFESTYLE_GRID_COUNT = 4;
 
-    private const VIDEO_TEASER_COUNT = 4;
+    private const VIDEO_TEASER_COUNT = 6;
 
     private const YOUTUBE_TEASER_COUNT = 4;
+
+    private const PODCAST_COUNT =10;
 
     public function __invoke(WordPressRepository $wp, PortalApiClient $portal, Request $request): Response|HttpResponse
     {
@@ -92,6 +94,7 @@ class HomeController extends Controller
         $entertainmentPosts = $wp->getPostsByCategorySlug('entertainment', ['per_page' => self::RAIL_COUNT])['items'];
         $sportsPosts = $wp->getPostsByCategorySlug('sports', ['per_page' => self::RAIL_COUNT])['items'];
         $lifestylePosts = $wp->getPostsByCategorySlug('lifestyle', ['per_page' => self::LIFESTYLE_GRID_COUNT])['items'];
+        $podcast = $portal->getPodcastEpisodes(self::PODCAST_COUNT);
 
         if (BotDetector::isBot($request)) {
             // Skips the portal calls entirely below (youtube videos, ad
@@ -131,6 +134,7 @@ class HomeController extends Controller
             'entertainmentPosts' => $entertainmentPosts,
             'sportsPosts' => $sportsPosts,
             'lifestylePosts' => $lifestylePosts,
+            'podcasts' => $podcast,
             'videoPosts' => $videoPosts,
             'youtubeVideos' => $youtubeVideos,
             'youtubeError' => $youtubeError,

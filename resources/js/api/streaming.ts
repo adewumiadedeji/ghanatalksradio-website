@@ -50,15 +50,20 @@ export interface StartSessionParams {
    * closeDanglingSessions() tell a real reconnect apart from a different
    * device on the same shared IP (see that method's docblock). */
   deviceId?: string;
+  /** Defaults to 'audio' server-side when omitted - RadioPlayer never needs
+   * to pass this. WatchToggle passes 'video' so it shows up correctly on
+   * the admin's Live Listeners page instead of looking like a radio
+   * listener. */
+  mediaType?: 'audio' | 'video';
 }
 
 /** Registers a listening session server-side. Returns a session_token that
  * must be passed to stopListeningSession() when playback actually stops. */
 export async function startListeningSession(params: StartSessionParams = {}): Promise<string> {
-  const { deviceId, ...rest } = params;
+  const { deviceId, mediaType, ...rest } = params;
   const data = await callApi<{ session_token: string }>('/api/listen/start', {
     method: 'POST',
-    body: JSON.stringify({ platform: 'web', device_id: deviceId, ...rest }),
+    body: JSON.stringify({ platform: 'web', device_id: deviceId, media_type: mediaType, ...rest }),
   });
   return data.session_token;
 }
@@ -113,4 +118,28 @@ export interface SessionStatus {
  * mobile app's kick-poll already does. */
 export async function getSessionStatus(sessionToken: string): Promise<SessionStatus> {
   return callApi<SessionStatus>(`/api/listen/status?session_token=${encodeURIComponent(sessionToken)}`);
+}
+
+/**
+ * "Is video live right now" — Modules\StreamingIntegration\Http\Controllers\
+ * Api\PublicVideoStreamController, see
+ * docs/architecture/08-video-streaming-integration-guide.md §8. Polled, not
+ * subscribed — this app has no real-time broadcast client wired up
+ * anywhere yet (NowPlayingUpdated has gone unconsumed client-side since it
+ * was added), so this deliberately matches the one proven, working pattern
+ * already in this file (getSessionStatus) rather than being the first to
+ * build that plumbing. Independent of audio entirely: video_live/hls_url
+ * being present has no bearing on whether the Icecast stream above is
+ * playing, and vice versa.
+ */
+export interface VideoStreamStatus {
+  video_live: boolean;
+  source_key?: string;
+  label?: string | null;
+  started_at?: string;
+  hls_url?: string | null;
+}
+
+export async function getVideoStreamStatus(): Promise<VideoStreamStatus> {
+  return callApi<VideoStreamStatus>('/api/video/status');
 }

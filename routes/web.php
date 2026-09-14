@@ -7,6 +7,7 @@ use App\Http\Controllers\CareersJobDetailController;
 use App\Http\Controllers\CareersLandingController;
 use App\Http\Controllers\CategoryArchiveController;
 use App\Http\Controllers\ContactUsController;
+use App\Http\Controllers\AboutUsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\LegacyPostRedirectController;
@@ -23,6 +24,9 @@ use App\Http\Controllers\RaffleController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SinglePostController;
 use App\Http\Controllers\VideosController;
+use App\Http\Controllers\EditorialPolicyController;
+use App\Http\Controllers\CorrectionsPolicyController;
+use App\Http\Controllers\AuthorsController;
 use Illuminate\Support\Facades\Route;
 
 // Universal Links (iOS) / App Links (Android) verification files - see
@@ -51,7 +55,11 @@ Route::get('/quizzes/{slug}', QuizDetailController::class)->name('quizzes.show')
 Route::get('/leaderboard', LeaderboardController::class)->name('leaderboard');
 Route::get('/privacy-policy', PrivacyPolicyController::class)->name('privacy-policy');
 Route::get('/contact-us', ContactUsController::class)->name('contact-us');
+Route::get('/about-us', AboutUsController::class)->name('about-us');
+Route::get('/authors', AuthorsController::class)->name('authors');
 Route::get('/account-deletion', AccountDeletionController::class)->name('account-deletion');
+Route::get('/editorial-policy', EditorialPolicyController::class)->name('editorial-policy');
+Route::get('/corrections-policy', CorrectionsPolicyController::class)->name('corrections-policy');
 
 // Must stay last - only fires when nothing above matched. See
 // LegacyPostRedirectController's own docblock for why this exists.

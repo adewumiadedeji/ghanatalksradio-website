@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { useAudioPlayer } from '../context/AudioPlayerContext';
+import { useAudioPlayer, LIVE_VIDEO_ID } from '../context/AudioPlayerContext';
 import {
   getListenerCount,
   getSessionStatus,
@@ -43,6 +43,62 @@ const pulse = keyframes`
   50% { opacity: 0.35; }
 `;
 
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
+`;
+
+// A plain React-state overlay, not window.confirm() - confirmed by direct
+// testing that a real blocking native confirm() dialog can itself pause
+// backgrounded media playback as a browser-level side effect, independent
+// of what the user answers. That would trip WatchToggle's onPause handler
+// and tear the video down before the user even gets to say "no" - this
+// component never touches the video element at all until the user
+// explicitly clicks through it, so there's no such side effect possible.
+const ConfirmBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 17, 22, 0.6);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: ${fadeIn} 0.15s ease;
+`;
+
+const ConfirmPanel = styled.div`
+  background: ${({ theme }) => theme.colors.surface};
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 17, 22, 0.28);
+  max-width: 360px;
+  padding: 1.5rem;
+`;
+
+const ConfirmText = styled.p`
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  color: ${({ theme }) => theme.colors.ink};
+  line-height: 1.5;
+`;
+
+const ConfirmActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+`;
+
+const ConfirmBtn = styled.button<{ $primary?: boolean }>`
+  border: none;
+  border-radius: ${({ theme }) => theme.radius.pill};
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: ${({ theme, $primary }) => ($primary ? theme.colors.ink : theme.colors.backgroundAlt)};
+  color: ${({ theme, $primary }) => ($primary ? theme.colors.background : theme.colors.inkMuted)};
+`;
+
 const spin = keyframes`
   to { transform: rotate(360deg); }
 `;
@@ -65,8 +121,8 @@ const Bar = styled.div`
 
 const PlayButton = styled.button<{ $status: PlayerStatus }>`
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: none;
   display: flex;
@@ -210,6 +266,7 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   const pollHandleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [listenerCount, setListenerCount] = useState<number | null>(null);
+  const [confirmingVideoSwitch, setConfirmingVideoSwitch] = useState(false);
 
   // Polls regardless of this player's own playback state - the count
   // reflects everyone listening station-wide, not just this tab, and
@@ -364,12 +421,35 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
     };
   }, []);
 
-  async function play() {
+  async function startPlayback() {
     if (!audioRef.current) return;
     setStatus('connecting');
     audioRef.current.load();
     const ok = await requestPlay(LIVE_STREAM_ID, audioRef.current);
     if (!ok) setStatus('error');
+  }
+
+  // Asymmetric on purpose (explicit product decision): switching FROM
+  // audio TO video happens silently (WatchToggle's own requestPlay call
+  // just pauses this player, no prompt) - but switching the other way,
+  // interrupting a live video someone is actively watching, asks for
+  // confirmation first. Watching feels like the bigger thing to lose
+  // without warning than a background radio stream does.
+  //
+  // A plain state-driven modal (below), not window.confirm() - confirmed
+  // by direct testing that a real blocking native confirm() dialog can
+  // itself pause backgrounded media as a browser-level side effect,
+  // regardless of what the user answers, which would trip WatchToggle's
+  // onPause handler and tear the video down before the user even gets to
+  // say "no". This never touches the video element until the user
+  // explicitly confirms, so that side effect can't happen here.
+  function play() {
+    if (!audioRef.current) return;
+    if (currentId === LIVE_VIDEO_ID) {
+      setConfirmingVideoSwitch(true);
+      return;
+    }
+    startPlayback();
   }
 
   function pause() {
@@ -389,11 +469,28 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
     }
   }
 
+  function confirmSwitchFromVideo() {
+    setConfirmingVideoSwitch(false);
+    startPlayback();
+  }
+
   const isPlaying = effectiveStatus === 'playing';
   const isBusy = effectiveStatus === 'connecting';
   const hasError = effectiveStatus === 'error';
 
   return (
+    <>
+    {confirmingVideoSwitch && (
+      <ConfirmBackdrop onClick={() => setConfirmingVideoSwitch(false)} role="dialog" aria-modal="true">
+        <ConfirmPanel onClick={(e) => e.stopPropagation()}>
+          <ConfirmText>Switching to Listen will stop the live video you're watching. Continue?</ConfirmText>
+          <ConfirmActions>
+            <ConfirmBtn type="button" onClick={() => setConfirmingVideoSwitch(false)}>Cancel</ConfirmBtn>
+            <ConfirmBtn type="button" $primary onClick={confirmSwitchFromVideo}>Switch to Listen</ConfirmBtn>
+          </ConfirmActions>
+        </ConfirmPanel>
+      </ConfirmBackdrop>
+    )}
     <Bar>
       {streamAvailable && (
         <audio
@@ -443,6 +540,7 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
         <span />
       </Bars>
     </Bar>
+    </>
   );
 }
 

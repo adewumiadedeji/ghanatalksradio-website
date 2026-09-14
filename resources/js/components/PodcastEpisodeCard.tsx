@@ -10,9 +10,11 @@ import youtubeIcon from '../assets/brands/youtube.png';
 import appleIcon from '../assets/brands/apple.png';
 import amazonIcon from '../assets/brands/amazon.png';
 import googleIcon from '../assets/brands/google.png';
+import banner from '../assets/banner.png';
 
 interface PodcastEpisodeCardProps {
   episode: PodcastEpisode;
+  showExternal?: Boolean
 }
 
 // ─── Waveform animation (same keyframe as RadioPlayer's Bars) ────────────────
@@ -70,6 +72,11 @@ const Body = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.tablet}) {
+    min-width: 200px;
+  }
 `;
 
 const ShowName = styled(Link)`
@@ -290,7 +297,7 @@ const platformIcons: Record<string, string> = {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function PodcastEpisodeCard({ episode }: PodcastEpisodeCardProps) {
+export function PodcastEpisodeCard({ episode, showExternal=true }: PodcastEpisodeCardProps) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { currentId, requestPlay, notifyStop } = useAudioPlayer();
@@ -393,7 +400,7 @@ export function PodcastEpisodeCard({ episode }: PodcastEpisodeCardProps) {
             <UnavailableNote>Audio unavailable for this episode</UnavailableNote>
           )}
 
-          {episode.show.external && (
+          {showExternal && episode.show.external && (
             <ServiceRow>
               <Label>LISTEN ON: </Label>
               {Object.entries(episode.show.external).map(([name, url]) =>

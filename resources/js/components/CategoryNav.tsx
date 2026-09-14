@@ -385,7 +385,7 @@ export function CategoryNav() {
       <PlaylistLink to="/jobs">Jobs</PlaylistLink>
       <ArenaDropdown />
       {/* <PlaylistLink to="/playlist">Playlist</PlaylistLink> */}
-      <MoreDropdown items={overflow} />
+      {/* <MoreDropdown items={overflow} /> */}
     </Nav>
   );
 }

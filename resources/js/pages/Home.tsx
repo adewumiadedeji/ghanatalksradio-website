@@ -16,6 +16,10 @@ import { VideoGrid } from '../components/VideoGrid';
 import { YoutubeVideoGrid } from '../components/YoutubeVideoGrid';
 import type { YoutubeVideoDto } from '../types/youtube';
 import type { BannerDto } from '../types/advertising';
+import type { PodcastEpisode } from '../types/podcast';
+import type { PodcastProps } from './Podcast';
+import { PodcastEpisodeList } from '../components/PodcastEpisodeList';
+import { PodcastCard } from '../components/PodcastCard';
 
 const YOUTUBE_TEASER_COUNT = 4;
 
@@ -29,6 +33,7 @@ interface HomeProps {
   entertainmentPosts: WPPost[];
   sportsPosts: WPPost[];
   lifestylePosts: WPPost[];
+  podcasts: PodcastProps;
   videoPosts: WPPost[];
   youtubeVideos: YoutubeVideoDto[];
   youtubeError: boolean;
@@ -172,10 +177,12 @@ export function Home({
   entertainmentPosts,
   sportsPosts,
   lifestylePosts,
+  podcasts,
   videoPosts,
   youtubeVideos,
   youtubeError,
 }: HomeProps) {
+
   return (
     <>
       <Head>
@@ -215,26 +222,15 @@ export function Home({
 
   
 
-      <SplitZone>
-        <TopStoriesGrid>
-          <CategorySection
+      <SplitZone style={{marginTop: 10}}>
+         <CategorySection
             title="Entertainment"
             categorySlug="entertainment"
             seeAllHref="/category/entertainment"
             hasPosts={entertainmentPosts.length > 0}
           >
             <PostRail posts={entertainmentPosts} isLoading={false} />
-          </CategorySection>   
-          <CategorySection
-            title="Sports"
-            categorySlug="sports"
-            seeAllHref="/category/sports"
-            hasPosts={sportsPosts.length > 0}
-          >
-            <PostRail posts={sportsPosts} isLoading={false} />
-          </CategorySection>
-        </TopStoriesGrid>
-         
+          </CategorySection> 
 
         <TrendingPanel>
           <EngagementBannerStrip banners={engagementBanners} />
@@ -242,7 +238,14 @@ export function Home({
       </SplitZone>
       
       
-     
+      <CategorySection
+        title="Sports"
+        categorySlug="sports"
+        seeAllHref="/category/sports"
+        hasPosts={sportsPosts.length > 0}
+      >
+        <PostRail posts={sportsPosts} isLoading={false} />
+      </CategorySection>
 
       <CategorySection
         title="Lifestyle"
@@ -251,6 +254,15 @@ export function Home({
         hasPosts={lifestylePosts.length > 0}
       >
         <PostGrid posts={lifestylePosts} isLoading={false} columns={4} />
+      </CategorySection>
+
+      <CategorySection
+        title="Podcasts"
+        categorySlug="podcasts"
+        seeAllHref="/podcast"
+        hasPosts={podcasts.episodes.length > 0}
+      >
+        <PodcastCard episodes={podcasts.episodes} isLoading={false} isError={false} />
       </CategorySection>
 
       {videoPosts.length > 0 && (

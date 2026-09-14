@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { CategoryNav } from './CategoryNav';
 import { MobileNavDrawer } from './MobileNavDrawer';
 import { RadioPlayer } from './RadioPlayer';
+import { WatchToggle } from './WatchToggle';
 import { AdSlot, GTR_AD_SLOTS } from './AdSlot';
 import { APP_LINKS, SOCIAL_LINKS } from './footerLinks';
 import { WelcomeModal } from './WelcomeModal';
@@ -11,6 +12,7 @@ import { CookieBanner } from './CookieBanner';
 import { PromoMessageBar } from './PromoMessageBar';
 import { ADVERTISER_PORTAL_URLS } from '../config/advertiserPortal';
 import logoUrl from '../assets/logo.png';
+import Search from './Search';
 
 const SkipLink = styled.a`
   position: absolute;
@@ -28,14 +30,20 @@ const SkipLink = styled.a`
   }
 `;
 
+
 const Header = styled.header`
   background: ${({ theme }) => theme.colors.surface};
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  position: sticky;
-  top: 0;
-  z-index: 40;
-`;
 
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+
+  width: 100%;
+  
+`;
 const HeaderInner = styled.div`
   max-width: ${({ theme }) => theme.maxWidth};
   margin: 0 auto;
@@ -46,7 +54,7 @@ const TopBar = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 0.9rem 0;
 `;
 
@@ -72,6 +80,11 @@ const PlayerSlot = styled.div`
   }
 `;
 
+const SearchSlot = styled.div`
+  display: flex;
+  min-width: 0;
+`;
+
 /** Hidden below tablet - MobileNavDrawer carries the same link there instead, same pattern as CategoryNav. */
 const AdvertiserActions = styled.div`
   display: flex;
@@ -85,7 +98,7 @@ const AdvertiserActions = styled.div`
 `;
 
 const GetStartedLink = styled.a`
-  padding: 1.0rem 1.1rem;
+  padding: 0.8rem 1rem;
   border-radius: ${({ theme }) => theme.radius.pill};
   background: ${({ theme }) => theme.colors.gold};
   color: ${({ theme }) => theme.colors.ink};
@@ -134,6 +147,8 @@ const Main = styled.main`
   padding: 2rem 1.25rem 3.5rem;
   min-height: 60vh;
 
+  margin-top: 100px;
+
   @media (max-width: ${({ theme }) => theme.breakpoints.tablet}) {
     padding-bottom: calc(3.5rem + ${MOBILE_PLAYER_BAR_RESERVE});
   }
@@ -150,7 +165,7 @@ const FooterInner = styled.div`
   margin: 0 auto;
   padding: 3rem 1.25rem 2.5rem;
   display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr;
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 1fr;
   gap: 2.5rem;
 
   @media (max-width: ${({ theme }) => theme.breakpoints.desktop}) {
@@ -317,12 +332,17 @@ export function Layout({ children }: { children: ReactNode }) {
             </SiteName>
             <CategoryNav />
             <Actions>
+              
               <PlayerSlot>
                 <RadioPlayer compact />
+                <WatchToggle />
               </PlayerSlot>
               <AdvertiserActions>
                 <GetStartedLink href={ADVERTISER_PORTAL_URLS.getStarted}>Get started</GetStartedLink>
               </AdvertiserActions>
+              <SearchSlot>
+                <Search />
+              </SearchSlot>
             </Actions>
             <MobileNavDrawer />
           </TopBar>
@@ -365,14 +385,37 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </FooterBrand>
 
+          <FooterCol style={{display: 'flex', flexDirection: 'row', gap: 20}}>
+            <div>
+              <FooterHeading>Explore</FooterHeading>
+              <FooterLinkList>
+                <Link to="/">Categories</Link>
+                <Link to="/category/entertainments">Entertainments</Link>
+                <Link to="/podcast">Podcasts</Link>
+                <Link to="/category/lifestyle">Lifestyle</Link>
+                <Link to="/playlist">Playlists</Link>
+              </FooterLinkList>
+            </div>
+            <div>
+              <FooterHeading>&nbsp;</FooterHeading>
+              <FooterLinkList>
+                <Link to="/category/business">Business</Link>
+                <Link to="/category/featured">Featured</Link>
+                <Link to="/category/tech">Technology</Link>
+                <Link to="/category/crime">Crime</Link>
+                <Link to="/playlist">Playlists</Link>
+              </FooterLinkList>
+            </div>
+          </FooterCol>
+
           <FooterCol>
-            <FooterHeading>Explore</FooterHeading>
+            <FooterHeading>Quick Links</FooterHeading>
             <FooterLinkList>
               <Link to="/">Home</Link>
-              <Link to="/playlist">Playlist</Link>
-              <Link to="/podcast">Podcast</Link>
+              <Link to="/about-us">About Us</Link>
+              <Link to="/authors">Authors</Link>
               <Link to="/search">Search</Link>
-              <Link to="/about-us">About</Link>
+              <Link to="/contact-us">Contact Us</Link>
             </FooterLinkList>
           </FooterCol>
 
@@ -393,7 +436,8 @@ export function Layout({ children }: { children: ReactNode }) {
           <Copyright>© {new Date().getFullYear()} GhanaTalksRadio. All rights reserved.</Copyright>
           <Privacy>
               <Link to="/privacy-policy">Privacy Policy</Link>
-              <Link to="/contact-us">Contact Us</Link>
+              <Link to="/editorial-policy">Editorial Policy</Link>
+              <Link to="/corrections-policy">Corrections Policy</Link>
               <Link to="/account-deletion">Delete your account</Link>
           </Privacy>
         </CopyContent>
@@ -402,6 +446,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <MobileBottomPlayerBar>
         <RadioPlayer compact />
+        <WatchToggle />
       </MobileBottomPlayerBar>
 
       <WelcomeModal />

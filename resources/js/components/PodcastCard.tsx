@@ -10,14 +10,15 @@ interface PodcastEpisodeListProps {
   direction?: string;
 }
 
-const List = styled.div<{$direction?: string}>`
+const List = styled.div`
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 1rem;
 
-  ${(props)=>props.$direction==='row' && css`
-    flex-direction: row;
-  `}
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.4rem;
+  scrollbar-width: thin;
 `;
 
 const StateBox = styled.div`
@@ -85,7 +86,7 @@ function SkeletonList() {
   );
 }
 
-export function PodcastEpisodeList({ episodes, isLoading, isError, error, direction='column' }: PodcastEpisodeListProps) {
+export function PodcastCard({ episodes, isLoading, isError, error }: PodcastEpisodeListProps) {
   if (isLoading) return <SkeletonList />;
 
   if (isError) {
@@ -102,9 +103,9 @@ export function PodcastEpisodeList({ episodes, isLoading, isError, error, direct
   }
 
   return (
-    <List $direction={direction}>
+    <List>
       {episodes.map((episode) => (
-        <PodcastEpisodeCard key={episode.id} episode={episode} />
+        <PodcastEpisodeCard key={episode.id} episode={episode} showExternal={false} />
       ))}
     </List>
   );

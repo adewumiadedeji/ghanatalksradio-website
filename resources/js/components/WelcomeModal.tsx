@@ -54,7 +54,7 @@ const Backdrop = styled.div`
   inset: 0;
   background: rgba(15, 17, 22, 0.72);
   backdrop-filter: blur(3px);
-  z-index: 200;
+  z-index: 20000;
   display: flex;
   align-items: center;
   justify-content: center;
