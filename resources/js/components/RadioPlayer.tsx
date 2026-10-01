@@ -38,6 +38,18 @@ type PlayerStatus = 'idle' | 'connecting' | 'playing' | 'error';
 // recover (onPlaying firing again cancels it) before treating it as real.
 const STALL_GRACE_MS = 20000;
 
+// Long-running live HTTP streams get dropped from time to time - the stream
+// server or a proxy in front of it closing the connection, a Wi-Fi/mobile
+// handover, a laptop waking from sleep. The browser reports that as an
+// `error` (MEDIA_ERR_NETWORK), an `ended`, or a stall that never recovers,
+// and never reconnects on its own. Showing "Can't connect" on the first
+// drop meant listeners got cut off every few minutes, so instead we
+// silently reopen the stream with backoff, and only surface an error once
+// several consecutive attempts have failed.
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 15000;
+const MAX_RECONNECT_ATTEMPTS = 8;
+
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -265,6 +277,15 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   const sessionTokenRef = useRef<string | null>(null);
   const pollHandleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True from the moment the listener presses play until they (or something
+  // else - another source, a kick) stop it. A dropped connection doesn't
+  // clear it, which is what tells the reconnect logic to keep trying.
+  const wantsPlaybackRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  // Set while we're deliberately reloading the element, so the pause/error
+  // events that reload can emit aren't mistaken for the listener stopping.
+  const reconnectingRef = useRef(false);
   const [listenerCount, setListenerCount] = useState<number | null>(null);
   const [confirmingVideoSwitch, setConfirmingVideoSwitch] = useState(false);
 
@@ -294,6 +315,10 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   const streamAvailable = Boolean(STREAM_URL);
 
   const isCurrentlyOwned = currentId === LIVE_STREAM_ID;
+  // Reconnect timers outlive the render that scheduled them, so they read
+  // ownership through a ref instead of a stale closure.
+  const currentIdRef = useRef(currentId);
+  currentIdRef.current = currentId;
   const effectiveStatus: PlayerStatus =
     status === 'playing' && !isCurrentlyOwned ? 'idle' : status;
 
@@ -311,15 +336,74 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
     }
   }
 
-  // Only reached if a stall never recovers within STALL_GRACE_MS - now
-  // treated as a real disconnect: pause the element for real (so the
-  // audio can't keep quietly playing/buffering against a UI that says
-  // it's stopped) and end the tracked session.
-  function handleStallTimeout() {
-    stallTimeoutRef.current = null;
+  function clearReconnect() {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    reconnectingRef.current = false;
+  }
+
+  // Terminal failure: the listener wanted audio but we couldn't get it
+  // back. Stop the element for real (so it can't keep quietly buffering
+  // against a UI that says it's stopped) and end the tracked session.
+  function giveUp() {
+    wantsPlaybackRef.current = false;
+    clearStallTimeout();
+    clearReconnect();
     audioRef.current?.pause();
     setStatus('error');
     reportListenStop();
+  }
+
+  function reconnectNow() {
+    reconnectTimerRef.current = null;
+    const el = audioRef.current;
+    if (!el || !wantsPlaybackRef.current) return;
+    // Something else (an episode, the live video) took over while we were
+    // waiting - don't start talking over it.
+    if (currentIdRef.current !== LIVE_STREAM_ID) {
+      wantsPlaybackRef.current = false;
+      reconnectingRef.current = false;
+      reportListenStop();
+      setStatus('idle');
+      return;
+    }
+    reconnectingRef.current = true;
+    // load() drops the dead connection and opens a fresh one to the live
+    // edge, rather than resuming a buffer that's now minutes behind.
+    el.load();
+    el.play().catch(() => {
+      reconnectingRef.current = false;
+      scheduleReconnect();
+    });
+  }
+
+  // Called for every kind of mid-listen drop (error, ended, unrecovered
+  // stall). Keeps the session and status poll running across the gap, so
+  // a brief reconnect doesn't register as a new listener.
+  function scheduleReconnect() {
+    clearStallTimeout();
+    if (!wantsPlaybackRef.current) return;
+    if (reconnectTimerRef.current) return;
+    if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+      giveUp();
+      return;
+    }
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttemptsRef.current,
+      RECONNECT_MAX_DELAY_MS,
+    );
+    reconnectAttemptsRef.current += 1;
+    setStatus('connecting');
+    reconnectTimerRef.current = setTimeout(reconnectNow, delay);
+  }
+
+  // Only reached if a stall never recovers within STALL_GRACE_MS - the
+  // connection is effectively dead, so reopen it.
+  function handleStallTimeout() {
+    stallTimeoutRef.current = null;
+    scheduleReconnect();
   }
 
   function handleStalled() {
@@ -341,6 +425,9 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
         if (sessionTokenRef.current !== token) return;
         stopStatusPoll();
         sessionTokenRef.current = null;
+        wantsPlaybackRef.current = false;
+        clearStallTimeout();
+        clearReconnect();
         audioRef.current?.pause();
         notifyStop(LIVE_STREAM_ID);
         setStatus('idle');
@@ -418,15 +505,34 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
       handleUnload();
       stopStatusPoll();
       clearStallTimeout();
+      clearReconnect();
     };
   }, []);
 
+  // When the device comes back online, don't sit out the rest of a backoff
+  // delay - retry straight away.
+  useEffect(() => {
+    function handleOnline() {
+      if (!reconnectTimerRef.current) return;
+      clearTimeout(reconnectTimerRef.current);
+      reconnectNow();
+    }
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  });
+
   async function startPlayback() {
     if (!audioRef.current) return;
+    clearReconnect();
+    wantsPlaybackRef.current = true;
+    reconnectAttemptsRef.current = 0;
     setStatus('connecting');
     audioRef.current.load();
     const ok = await requestPlay(LIVE_STREAM_ID, audioRef.current);
-    if (!ok) setStatus('error');
+    if (!ok) {
+      wantsPlaybackRef.current = false;
+      setStatus('error');
+    }
   }
 
   // Asymmetric on purpose (explicit product decision): switching FROM
@@ -453,7 +559,9 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   }
 
   function pause() {
+    wantsPlaybackRef.current = false;
     clearStallTimeout();
+    clearReconnect();
     audioRef.current?.pause();
     notifyStop(LIVE_STREAM_ID);
     reportListenStop();
@@ -497,11 +605,43 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
           ref={audioRef}
           src={STREAM_URL}
           preload="none"
-          onPlaying={() => { clearStallTimeout(); setStatus('playing'); reportListenStart(); }}
+          onPlaying={() => {
+            clearStallTimeout();
+            reconnectingRef.current = false;
+            reconnectAttemptsRef.current = 0;
+            setStatus('playing');
+            reportListenStart();
+          }}
           onWaiting={() => setStatus('connecting')}
           onStalled={handleStalled}
-          onError={() => { clearStallTimeout(); setStatus('error'); reportListenStop(); }}
-          onPause={() => { clearStallTimeout(); setStatus((s) => (s === 'error' ? s : 'idle')); }}
+          onError={() => {
+            // Errors while the listener isn't trying to play (e.g. a
+            // failed first connect already handled by startPlayback)
+            // still need to show up.
+            if (wantsPlaybackRef.current) {
+              reconnectingRef.current = false;
+              scheduleReconnect();
+            } else {
+              clearStallTimeout();
+              setStatus('error');
+              reportListenStop();
+            }
+          }}
+          // A live stream never legitimately ends - the server closed the
+          // connection.
+          onEnded={scheduleReconnect}
+          onPause={() => {
+            if (reconnectingRef.current || reconnectTimerRef.current) return;
+            clearStallTimeout();
+            // Paused by something other than our own pause() - another
+            // source taking over, or OS/headset media controls. Stop
+            // treating this as an active listen.
+            if (wantsPlaybackRef.current) {
+              wantsPlaybackRef.current = false;
+              reportListenStop();
+            }
+            setStatus((s) => (s === 'error' ? s : 'idle'));
+          }}
         />
       )}
 
