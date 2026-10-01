@@ -348,6 +348,7 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   // back. Stop the element for real (so it can't keep quietly buffering
   // against a UI that says it's stopped) and end the tracked session.
   function giveUp() {
+    console.warn(`[radio] giving up after ${MAX_RECONNECT_ATTEMPTS} failed reconnect attempts`);
     wantsPlaybackRef.current = false;
     clearStallTimeout();
     clearReconnect();
@@ -373,7 +374,8 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
     // load() drops the dead connection and opens a fresh one to the live
     // edge, rather than resuming a buffer that's now minutes behind.
     el.load();
-    el.play().catch(() => {
+    el.play().catch((err) => {
+      console.warn('[radio] reconnect play() rejected:', err?.name, err?.message);
       reconnectingRef.current = false;
       scheduleReconnect();
     });
@@ -395,6 +397,7 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
       RECONNECT_MAX_DELAY_MS,
     );
     reconnectAttemptsRef.current += 1;
+    console.warn(`[radio] reconnect attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
     setStatus('connecting');
     reconnectTimerRef.current = setTimeout(reconnectNow, delay);
   }
@@ -402,6 +405,7 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   // Only reached if a stall never recovers within STALL_GRACE_MS - the
   // connection is effectively dead, so reopen it.
   function handleStallTimeout() {
+    console.warn(`[radio] stream stalled for ${STALL_GRACE_MS}ms`);
     stallTimeoutRef.current = null;
     scheduleReconnect();
   }
@@ -614,7 +618,9 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
           }}
           onWaiting={() => setStatus('connecting')}
           onStalled={handleStalled}
-          onError={() => {
+          onError={(e) => {
+            const err = e.currentTarget.error;
+            console.warn('[radio] audio error:', err?.code, err?.message);
             // Errors while the listener isn't trying to play (e.g. a
             // failed first connect already handled by startPlayback)
             // still need to show up.
@@ -629,7 +635,10 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
           }}
           // A live stream never legitimately ends - the server closed the
           // connection.
-          onEnded={scheduleReconnect}
+          onEnded={() => {
+            console.warn('[radio] stream ended (server closed the connection)');
+            scheduleReconnect();
+          }}
           onPause={() => {
             if (reconnectingRef.current || reconnectTimerRef.current) return;
             clearStallTimeout();
