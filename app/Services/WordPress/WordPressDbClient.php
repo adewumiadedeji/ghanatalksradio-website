@@ -75,6 +75,21 @@ class WordPressDbClient implements WordPressRepository
         return $this->hydratePosts(collect([$row]))[0] ?? null;
     }
 
+    public function getPostById(int $id): ?array
+    {
+        $row = DB::connection(self::CONNECTION)->table('posts')
+            ->where('post_type', 'post')
+            ->where('post_status', 'publish')
+            ->where('ID', $id)
+            ->first();
+
+        if (! $row) {
+            return null;
+        }
+
+        return $this->hydratePosts(collect([$row]))[0] ?? null;
+    }
+
     public function getPageBySlug(string $slug): ?array
     {
         $row = DB::connection(self::CONNECTION)->table('posts')

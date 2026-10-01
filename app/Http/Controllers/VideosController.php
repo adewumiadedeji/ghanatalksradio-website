@@ -43,6 +43,11 @@ class VideosController extends Controller
             'videos' => Inertia::merge($data['videos']),
             'nextPageToken' => $data['nextPageToken'],
             'isError' => $isError,
+            // VodSection's right-column ad carousel (shown only once a
+            // viewer joins the live studio stream) - merges these two
+            // otherwise-separate sources client-side, see VideoAdsSidebar.
+            'videoBanners' => $portal->fetchBanners('web_video'),
+            'engagementBanners' => $portal->fetchEngagementBanners(),
         ]);
     }
 }

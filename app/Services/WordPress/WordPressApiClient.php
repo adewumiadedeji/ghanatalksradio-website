@@ -114,6 +114,21 @@ class WordPressApiClient implements WordPressRepository
         });
     }
 
+    public function getPostById(int $id): ?array
+    {
+        return Cache::remember("wp_api:post_id:{$id}", self::CACHE_TTL_SECONDS, function () use ($id) {
+            $response = $this->http()->get("{$this->baseUrl}/posts/{$id}", [
+                '_embed' => 'true',
+            ]);
+
+            if ($response->failed()) {
+                return null;
+            }
+
+            return $response->json();
+        });
+    }
+
     public function getPageBySlug(string $slug): ?array
     {
         // Same CATEGORY_CACHE_TTL_SECONDS as getCategoryBySlug() - a

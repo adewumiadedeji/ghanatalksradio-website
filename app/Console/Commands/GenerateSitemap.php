@@ -42,8 +42,17 @@ class GenerateSitemap extends Command
         $pageUrls = [];
         $indexNowUrls = [];
 
+        // Not pushed to IndexNow - the homepage and these landing pages
+        // are static URLs that don't meaningfully "just change" on every
+        // run the way a new/edited post does. This command regenerates on
+        // every WordPress publish webhook (potentially dozens of times a
+        // day), so unconditionally re-pinging the same unchanged URLs
+        // every single run is exactly the "spam rather than a real
+        // freshness signal" problem the posts-only IndexNow filter below
+        // was built to avoid - found live when Bing's own IndexNow
+        // submission export showed these static URLs resubmitted on every
+        // run alongside genuinely new articles.
         $pageUrls[] = $this->urlEntry("{$siteUrl}/", $today, 'hourly', '1.0');
-        $indexNowUrls[] = "{$siteUrl}/";
 
         $pageUrls[] = $this->urlEntry("{$siteUrl}/podcast", $today, 'daily', '0.8');
         $pageUrls[] = $this->urlEntry("{$siteUrl}/playlist", $today, 'weekly', '0.7');
@@ -59,14 +68,18 @@ class GenerateSitemap extends Command
         // underlying results change constantly, hence 'daily' + always
         // today's lastmod.
         $pageUrls[] = $this->urlEntry("{$siteUrl}/jobs", $today, 'daily', '0.8');
-        $indexNowUrls[] = "{$siteUrl}/jobs";
         foreach (array_keys(CareersLandings::all()) as $slug) {
             $loc = "{$siteUrl}/jobs/{$slug}";
             $pageUrls[] = $this->urlEntry($loc, $today, 'daily', '0.7');
-            $indexNowUrls[] = $loc;
         }
 
         $categories = $wp->getAllCategories();
+        // /category itself, not just each /category/{slug} - a real,
+        // crawlable directory page so Google has one stable URL listing
+        // every category, rather than categories only being discoverable
+        // through the header's nav dropdown (client-rendered, not a
+        // crawlable link).
+        $pageUrls[] = $this->urlEntry("{$siteUrl}/category", $today, 'weekly', '0.6');
         foreach ($categories as $category) {
             $pageUrls[] = $this->urlEntry("{$siteUrl}/category/{$category['slug']}", '', 'daily', '0.6');
         }
@@ -120,12 +133,17 @@ class GenerateSitemap extends Command
             }
         });
         $postFiles = [];
+        $postFileLastmods = [];
         $chunk = [];
+        $chunkMaxMod = '';
 
         foreach ($posts as $post) {
             $mod = $post['modified'] ? date('Y-m-d', strtotime($post['modified'])) : '';
             $loc = "{$siteUrl}/post/{$post['slug']}";
             $chunk[] = $this->urlEntry($loc, $mod, 'weekly', '0.7');
+            // 'Y-m-d' strings sort lexicographically, so a plain string
+            // comparison is a correct max-date check without parsing.
+            $chunkMaxMod = $mod > $chunkMaxMod ? $mod : $chunkMaxMod;
 
             // Only today's new/edited posts, not the full ~10k-post
             // backlog on every run - IndexNow is a "this just changed"
@@ -141,20 +159,35 @@ class GenerateSitemap extends Command
 
             if (count($chunk) >= self::POSTS_PER_FILE) {
                 $postFiles[] = 'sitemap-posts-'.(count($postFiles) + 1).'.xml';
+                $postFileLastmods[] = $chunkMaxMod ?: $today;
                 $this->writeUrlset(end($postFiles), $chunk);
                 $chunk = [];
+                $chunkMaxMod = '';
             }
         }
         if (! empty($chunk)) {
             $postFiles[] = 'sitemap-posts-'.(count($postFiles) + 1).'.xml';
+            $postFileLastmods[] = $chunkMaxMod ?: $today;
             $this->writeUrlset(end($postFiles), $chunk);
         }
 
         // ─── Sitemap index ───
 
+        // Each sub-sitemap's own lastmod reflects the real max modified
+        // date of the posts actually inside it, not a blanket $today for
+        // every file on every run - found live via Bing Webmaster Tools
+        // showing each individual sub-sitemap's own crawl lagging days
+        // behind the index's: claiming all three sub-sitemaps "changed
+        // today" on every single regeneration (this command runs on every
+        // WordPress publish webhook, easily dozens of times a day) taught
+        // Bing to distrust the freshness signal entirely and fall back to
+        // its own crawl scheduling instead. sitemap-posts-1.xml in
+        // particular (the oldest, largest, most static chunk - new posts
+        // only ever land in the newest/last chunk) essentially never
+        // actually changes, so it should almost never claim "today".
         $indexEntries = [$this->sitemapEntry("{$siteUrl}/sitemap-pages.xml", $today)];
-        foreach ($postFiles as $file) {
-            $indexEntries[] = $this->sitemapEntry("{$siteUrl}/{$file}", $today);
+        foreach ($postFiles as $i => $file) {
+            $indexEntries[] = $this->sitemapEntry("{$siteUrl}/{$file}", $postFileLastmods[$i]);
         }
 
         $indexXml = '<?xml version="1.0" encoding="UTF-8"?>'."\n"

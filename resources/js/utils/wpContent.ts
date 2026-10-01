@@ -69,6 +69,13 @@ export function getAuthorName(post: WPPost): string {
   return post._embedded?.author?.[0]?.name ?? 'GhanaTalksRadio';
 }
 
+/** Author's Gravatar avatar, if present - WordPress's own `avatar_urls` map (keyed by pixel size). No per-author "job title" exists in this data, so callers show name only, not an invented role. */
+export function getAuthorAvatarUrl(post: WPPost, size = 96): string | undefined {
+  const avatars = post._embedded?.author?.[0]?.avatar_urls;
+  if (!avatars) return undefined;
+  return avatars[String(size)] ?? Object.values(avatars)[0];
+}
+
 /**
  * Resolves category names for a post from its _embedded wp:term data.
  * wp:term is an array-of-arrays aligned to the post type's taxonomies
@@ -84,9 +91,20 @@ export function getEmbeddedTags(post: WPPost) {
   return terms.filter((t) => t.taxonomy === 'post_tag');
 }
 
-/** Formats a WP date string for display, e.g. "23 June 2026". */
+/**
+ * Formats a WP date string for display, e.g. "23 June 2026". Empty
+ * string, `undefined`, or otherwise unparseable input renders as '' -
+ * `new Date('').toLocaleDateString()` otherwise returns the literal text
+ * "Invalid Date", which has shown up in production (a VOD DTO without a
+ * real published_at, e.g. the scheduled-playlist hero's placeholder
+ * value - see VodSection.tsx's own comment on scheduledVodDto).
+ */
 export function formatPostDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-GB', {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',

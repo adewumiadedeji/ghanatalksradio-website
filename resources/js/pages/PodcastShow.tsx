@@ -15,7 +15,7 @@ interface PodcastShowProps {
   page: number;
   totalPages: number;
   isError: boolean;
-  banner: BannerDto | null;
+  banners?: BannerDto[];
 }
 
 const BackLink = styled(Link)`
@@ -124,7 +124,7 @@ const StateBox = styled.div`
  * resolved server-side (PodcastShowController) instead of a react-query
  * hook; pagination is a real Inertia navigation.
  */
-export function PodcastShow({ episodes, show, page, totalPages, isError, banner }: PodcastShowProps) {
+export function PodcastShow({ episodes, show, page, totalPages, isError, banners }: PodcastShowProps) {
   const platformLinks = show ? getAvailablePlatformLinks(show.external) : [];
 
   function handlePageChange(newPage: number) {
@@ -178,7 +178,7 @@ export function PodcastShow({ episodes, show, page, totalPages, isError, banner 
 
       <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
 
-      <SponsoredBanner banner={banner} />
+      <SponsoredBanner banners={banners} />
       <AdSlot format="leaderboard" slotId={GTR_AD_SLOTS.vertical} />
     </>
   );

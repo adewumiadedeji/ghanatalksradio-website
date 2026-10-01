@@ -31,7 +31,7 @@ class SinglePostController extends Controller
         }
 
         PageMeta::set(
-            title: $post['title']['rendered'].' | GhanaTalksRadio',
+            title: PageMeta::truncatedTitle($post['title']['rendered']),
             description: $post['excerpt']['rendered'] ?? null,
             image: $post['_embedded']['wp:featuredmedia'][0]['source_url'] ?? null,
         );
@@ -43,7 +43,7 @@ class SinglePostController extends Controller
         return Inertia::render('SinglePost', [
             'post' => $post,
             'url' => PageMeta::canonicalUrl(),
-            'banner' => $portal->fetchBanners('web_article')[0] ?? null,
+            'banners' => $portal->fetchBanners('web_article'),
         ]);
     }
 }

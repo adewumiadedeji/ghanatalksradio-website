@@ -300,6 +300,18 @@ class PortalApiClient
             throw new PortalApiException($json['message'] ?? 'Portal API returned an error');
         }
 
+        // A response that isn't the expected {status, data} envelope at all
+        // (e.g. a 422 validation-error shape - {message, errors}, no
+        // 'status' or 'data' key - hit directly via an unknown `placement`
+        // value) previously crashed here with an uncaught "Undefined array
+        // key" ErrorException instead of the PortalApiException every
+        // caller already catches - defeating every fail-soft method's own
+        // documented contract (fetchBanners() etc.) and taking the whole
+        // page down over what should be an empty-array fallback.
+        if (! array_key_exists('data', $json)) {
+            throw new PortalApiException($json['message'] ?? 'Portal API returned an unexpected response shape');
+        }
+
         return $json['data'];
     }
 

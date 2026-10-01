@@ -1,11 +1,14 @@
 import { i as __require, o as __toESM, t as __commonJSMin } from "./assets/rolldown-runtime-BMI-E3GI.js";
-import { a as bt, i as Vt, n as Tt, o as qt, r as Ut, s as require_react, t as require_jsx_runtime } from "./assets/jsx-runtime-BC7GUiKv.js";
-import { a as usePage, o as require_react_dom, r as createInertiaApp } from "./assets/index.esm-zJybEw0J.js";
-import { t as AudioPlayerProvider } from "./assets/AudioPlayerContext-B1i_wU94.js";
-import { t as Link } from "./assets/Link-W-JB9btq.js";
-import { n as RadioPlayer } from "./assets/RadioPlayer-Ql1Jw-7m.js";
-import { n as GTR_AD_SLOTS, t as AdSlot } from "./assets/AdSlot-CQVTHkAz.js";
-import { n as CHANNEL_LINKS, r as SOCIAL_LINKS, t as APP_LINKS } from "./assets/footerLinks-DqQSNlGQ.js";
+import { a as Vt, c as require_react, i as Ut, o as bt, r as Tt, s as qt, t as require_jsx_runtime } from "./assets/jsx-runtime-BjQWgNTJ.js";
+import { a as usePage, i as router3, o as require_react_dom, r as createInertiaApp } from "./assets/index.esm-WJJ4XT9m.js";
+import { t as AudioPlayerProvider } from "./assets/AudioPlayerContext-D8RFr5Sn.js";
+import { a as getVideoStreamStatus } from "./assets/deviceId-D7ymQWPP.js";
+import { n as useFloatingVideo, t as FloatingVideoProvider } from "./assets/FloatingVideoContext-Bw-jiMdt.js";
+import { t as Link } from "./assets/Link-CrWePb0Y.js";
+import { c as CategoryNav, l as useNav, r as MastheadTitle, s as ARENA_ITEMS } from "./assets/HomeEditorial-BpvIaCne.js";
+import { n as RadioPlayer } from "./assets/RadioPlayer-Z3xtZTHp.js";
+import { n as GTR_AD_SLOTS, t as AdSlot } from "./assets/AdSlot-BKXWXakb.js";
+import { n as CHANNEL_LINKS, r as SOCIAL_LINKS, t as APP_LINKS } from "./assets/footerLinks-CBwulu-M.js";
 import { t as logo_default } from "./assets/logo-BLzQFDMr.js";
 import { createServer } from "http";
 import cluster from "node:cluster";
@@ -19256,7 +19259,10 @@ var theme = {
 	font: {
 		display: `'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
 		body: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
-		mono: `'JetBrains Mono', 'SF Mono', Menlo, monospace`
+		mono: `'JetBrains Mono', 'SF Mono', Menlo, monospace`,
+		/** Editorial masthead/headline face for the redesigned Home page only -
+		* everywhere else keeps `display` (Space Grotesk) unchanged. */
+		serif: `'Source Serif 4', Georgia, 'Times New Roman', serif`
 	},
 	radius: {
 		sm: "8px",
@@ -19364,408 +19370,12 @@ async function resolvePageComponent(path, pages) {
 	throw new Error(`Page not found: ${path}`);
 }
 //#endregion
-//#region resources/js/hooks/useNav.ts
+//#region resources/js/config/advertiserPortal.ts
 var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
-/** Reads the server-resolved nav data shared on every Inertia response - no client fetch needed. */
-function useNav() {
-	return usePage().props.nav;
-}
-//#endregion
-//#region resources/js/components/CategoryNav.tsx
-var import_jsx_runtime = require_jsx_runtime();
-var Nav = Tt.nav`
-  display: flex;
-  align-items: center;
-  gap: 1.6rem;
-  flex-wrap: wrap;
-  padding-top: 0.85rem;
-
-  @media (max-width: ${({ theme }) => theme.breakpoints.tablet}) {
-    display: none;
-  }
-`;
-var linkStyles = `
-  font-size: 0.94rem;
-  font-weight: 600;
-  white-space: nowrap;
-  position: relative;
-  padding-bottom: 2px;
-  transition: color 0.15s ease;
-
-  &::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    bottom: -2px;
-    width: 0;
-    height: 2px;
-    transition: width 0.15s ease;
-  }
-`;
-var NavLink = Tt(Link)`
-  ${linkStyles}
-  color: ${({ theme }) => theme.colors.inkMuted};
-
-  &::after {
-    background: ${({ theme }) => theme.colors.gold};
-  }
-
-  &:hover {
-    color: ${({ theme }) => theme.colors.ink};
-  }
-
-  &:hover::after {
-    width: 100%;
-  }
-`;
-var PlaylistLink = Tt(NavLink)`
-  &::after {
-    background: ${({ theme }) => theme.colors.goldDark};
-  }
-
-  &:hover {
-    color: ${({ theme }) => theme.colors.goldDark};
-  }
-`;
-var DropdownWrap = Tt.div`
-  position: relative;
-`;
-var DropdownTriggerLink = Tt(Link)`
-  ${linkStyles}
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: ${({ theme }) => theme.colors.inkMuted};
-
-  &::after {
-    background: ${({ theme }) => theme.colors.gold};
-  }
-
-  &:hover {
-    color: ${({ theme }) => theme.colors.ink};
-  }
-
-  &:hover::after {
-    width: 100%;
-  }
-`;
-var DropdownTriggerButton = Tt.button`
-  ${linkStyles}
-  background: none;
-  border: none;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  cursor: pointer;
-  font-family: inherit;
-  color: ${({ theme, $open, $accent }) => $accent ? theme.colors.goldDark : $open ? theme.colors.ink : theme.colors.inkMuted};
-
-  &::after {
-    background: ${({ theme, $accent }) => $accent ? theme.colors.goldDark : theme.colors.gold};
-    width: ${({ $open }) => $open ? "100%" : "0"};
-  }
-
-  &:hover {
-    color: ${({ theme, $accent }) => $accent ? theme.colors.goldDark : theme.colors.ink};
-  }
-
-  &:hover::after {
-    width: 100%;
-  }
-`;
-var Chevron = Tt.svg`
-  width: 9px;
-  height: 9px;
-  flex-shrink: 0;
-  transition: transform 0.15s ease;
-  transform: rotate(${({ $open }) => $open ? "180deg" : "0deg"});
-`;
-var Dropdown = Tt.div`
-  /* No gap between trigger and panel — a gap here breaks mouseenter/leave
-     continuity (the cursor exits the hoverable wrapper while crossing it,
-     closing the dropdown before it can be reached). The visual breathing
-     room below the trigger comes from padding-top on this element instead,
-     which stays inside the hoverable hit area. */
-  top: 100%;
-  left: 0;
-  padding-top: 0.6rem;
-  z-index: 50;
-  position: absolute;
-`;
-var DropdownPanel = Tt.div`
-  min-width: 200px;
-  background: ${({ theme }) => theme.colors.surface};
-  border-radius: ${({ theme }) => theme.radius.sm};
-  box-shadow: ${({ theme }) => theme.shadow.md};
-  padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
-`;
-var DropdownItem = Tt(Link)`
-  padding: 0.55rem 0.75rem;
-  border-radius: ${({ theme }) => theme.radius.sm};
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.ink};
-  white-space: nowrap;
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.backgroundAlt};
-    text-decoration: none;
-    color: ${({ theme }) => theme.colors.goldDark};
-  }
-`;
-/** Generic dismissible dropdown wrapper — hover to open on desktop, click toggles, click-outside and Escape both close it. */
-function useDismissibleOpen() {
-	const [open, setOpen] = (0, import_react.useState)(false);
-	const wrapRef = (0, import_react.useRef)(null);
-	(0, import_react.useEffect)(() => {
-		if (!open) return;
-		function handleClickOutside(e) {
-			if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
-		}
-		function handleEscape(e) {
-			if (e.key === "Escape") setOpen(false);
-		}
-		document.addEventListener("mousedown", handleClickOutside);
-		document.addEventListener("keydown", handleEscape);
-		return () => {
-			document.removeEventListener("mousedown", handleClickOutside);
-			document.removeEventListener("keydown", handleEscape);
-		};
-	}, [open]);
-	return {
-		open,
-		setOpen,
-		wrapRef
-	};
-}
-function NavGroupDropdown({ label, slug, children, basePath = "/category", accent = false }) {
-	const { open, setOpen, wrapRef } = useDismissibleOpen();
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownWrap, {
-		ref: wrapRef,
-		onMouseEnter: () => setOpen(true),
-		onMouseLeave: () => setOpen(false),
-		children: [slug ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownTriggerLink, {
-			to: `${basePath}/${slug}`,
-			"aria-expanded": open,
-			"aria-haspopup": "true",
-			children: [label, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Chevron, {
-				$open: open,
-				viewBox: "0 0 10 6",
-				fill: "none",
-				"aria-hidden": "true",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-					d: "M1 1L5 5L9 1",
-					stroke: "currentColor",
-					strokeWidth: "1.6",
-					strokeLinecap: "round",
-					strokeLinejoin: "round"
-				})
-			})]
-		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownTriggerButton, {
-			type: "button",
-			$open: open,
-			$accent: accent,
-			"aria-expanded": open,
-			"aria-haspopup": "true",
-			onClick: () => setOpen((o) => !o),
-			children: [label, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Chevron, {
-				$open: open,
-				viewBox: "0 0 10 6",
-				fill: "none",
-				"aria-hidden": "true",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-					d: "M1 1L5 5L9 1",
-					stroke: "currentColor",
-					strokeWidth: "1.6",
-					strokeLinecap: "round",
-					strokeLinejoin: "round"
-				})
-			})]
-		}), open && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dropdown, {
-			role: "menu",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownPanel, { children: children.map((child) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownItem, {
-				to: `${basePath}/${child.slug}`,
-				role: "menuitem",
-				onClick: () => setOpen(false),
-				children: child.label
-			}, child.slug)) })
-		})]
-	});
-}
-/**
-* "Podcast" nav entry — a dropdown listing distinct shows, each linking to
-* its own /podcast/:showSlug archive page. Falls back to a plain link to
-* /podcast (no dropdown) if none were found, rather than showing an empty
-* or broken chevron. Show data comes from the shared nav prop (resolved
-* server-side) instead of a client fetch.
-*/
-function PodcastNavDropdown() {
-	const { podcastShows } = useNav();
-	if (podcastShows.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlaylistLink, {
-		to: "/podcast",
-		children: "Podcast"
-	});
-	const complete = [{
-		label: "All Podcast",
-		slug: ""
-	}, ...podcastShows.map((show) => ({
-		label: show.name,
-		slug: show.slug
-	}))];
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NavGroupDropdown, {
-		label: "Podcast",
-		slug: void 0,
-		basePath: "/podcast",
-		children: complete
-	});
-}
-/** Shared with MobileNavDrawer so both surfaces list the same Arena items
-* in the same order — Raffle, Predictions, Quizzes and Leaderboard are
-* unrelated route trees (no shared URL prefix), so this is a plain
-* label/to list rather than the slug+basePath shape NavGroupDropdown
-* uses for WordPress-category dropdowns. */
-var ARENA_ITEMS = [
-	{
-		label: "Raffle",
-		to: "/raffle"
-	},
-	{
-		label: "Predictions",
-		to: "/predictions"
-	},
-	{
-		label: "Quizzes",
-		to: "/quizzes"
-	},
-	{
-		label: "Leaderboard",
-		to: "/leaderboard"
-	}
-];
-function ArenaDropdown() {
-	const { open, setOpen, wrapRef } = useDismissibleOpen();
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownWrap, {
-		ref: wrapRef,
-		onMouseEnter: () => setOpen(true),
-		onMouseLeave: () => setOpen(false),
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownTriggerButton, {
-			type: "button",
-			$open: open,
-			"aria-expanded": open,
-			"aria-haspopup": "true",
-			onClick: () => setOpen((o) => !o),
-			children: ["Arena", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Chevron, {
-				$open: open,
-				viewBox: "0 0 10 6",
-				fill: "none",
-				"aria-hidden": "true",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-					d: "M1 1L5 5L9 1",
-					stroke: "currentColor",
-					strokeWidth: "1.6",
-					strokeLinecap: "round",
-					strokeLinejoin: "round"
-				})
-			})]
-		}), open && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dropdown, {
-			role: "menu",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownPanel, { children: ARENA_ITEMS.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownItem, {
-				to: item.to,
-				role: "menuitem",
-				onClick: () => setOpen(false),
-				children: item.label
-			}, item.to)) })
-		})]
-	});
-}
-function MoreDropdown({ items }) {
-	const { open, setOpen, wrapRef } = useDismissibleOpen();
-	if (items.length === 0) return null;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownWrap, {
-		ref: wrapRef,
-		onMouseEnter: () => setOpen(true),
-		onMouseLeave: () => setOpen(false),
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DropdownTriggerButton, {
-			type: "button",
-			$open: open,
-			"aria-expanded": open,
-			"aria-haspopup": "true",
-			onClick: () => setOpen((o) => !o),
-			children: ["More", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Chevron, {
-				$open: open,
-				viewBox: "0 0 10 6",
-				fill: "none",
-				"aria-hidden": "true",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
-					d: "M1 1L5 5L9 1",
-					stroke: "currentColor",
-					strokeWidth: "1.6",
-					strokeLinecap: "round",
-					strokeLinejoin: "round"
-				})
-			})]
-		}), open && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Dropdown, {
-			role: "menu",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownPanel, { children: items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DropdownItem, {
-				to: `/category/${item.slug}`,
-				role: "menuitem",
-				onClick: () => setOpen(false),
-				children: item.label
-			}, item.slug)) })
-		})]
-	});
-}
-/**
-* Site nav, grouped into the requested structure (Home / News / Podcast /
-* Entertainment.../ Lifestyle.../ Sports / Videos / Arena / Playlist /
-* More). Ported from the Vite SPA's CategoryNav.tsx - the resolution
-* against live WordPress categories now happens server-side
-* (App\Services\Nav\NavResolver, shared via HandleInertiaRequests) instead
-* of a client react-query fetch, so there's no loading/error state here
-* anymore - the data is always present by the time this renders.
-*/
-function CategoryNav() {
-	const { groups, overflow } = useNav();
-	const newsGroup = groups.find((g) => g.label === "News");
-	const restGroups = groups.filter((g) => g.label !== "News");
-	function renderGroup(group) {
-		return group.children.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NavGroupDropdown, {
-			label: group.label,
-			slug: group.slug,
-			children: group.children
-		}, group.label) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NavLink, {
-			to: `/category/${group.slug}`,
-			children: group.label
-		}, group.label);
-	}
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Nav, {
-		"aria-label": "Site sections",
-		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(NavLink, {
-				to: "/",
-				children: "Home"
-			}),
-			newsGroup && renderGroup(newsGroup),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PodcastNavDropdown, {}),
-			restGroups.map(renderGroup),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlaylistLink, {
-				to: "/videos",
-				children: "Videos"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlaylistLink, {
-				to: "/jobs",
-				children: "Jobs"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArenaDropdown, {}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MoreDropdown, { items: overflow })
-		]
-	});
-}
 var ADVERTISER_PORTAL_URLS = { getStarted: `${"https://app.ghanatalksradio.com".replace(/\/$/, "") || "https://app.ghanatalksradio.com"}/portal/register` };
 //#endregion
 //#region resources/js/components/MobileNavDrawer.tsx
+var import_jsx_runtime = require_jsx_runtime();
 var HamburgerButton = Tt.button`
   display: none;
   align-items: center;
@@ -19821,7 +19431,7 @@ var DrawerTitle = Tt.span`
   font-weight: 700;
   font-size: 1.05rem;
 `;
-var CloseButton = Tt.button`
+var CloseButton$1 = Tt.button`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -20003,7 +19613,7 @@ function MobileNavDrawer() {
 			"aria-modal": "true",
 			"aria-label": "Site menu",
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DrawerHeader, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DrawerTitle, { children: "Menu" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseButton, {
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(DrawerHeader, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DrawerTitle, { children: "Menu" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseButton$1, {
 					type: "button",
 					"aria-label": "Close menu",
 					onClick: close,
@@ -20062,6 +19672,241 @@ function MobileNavDrawer() {
 	] });
 }
 //#endregion
+//#region resources/js/components/WatchToggle.tsx
+var STATUS_POLL_MS = 15e3;
+var pulse = qt`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+`;
+var WatchButton = Tt.button`
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.35rem;
+  flex-shrink: 0;
+  border: none;
+  border-radius: ${({ theme }) => theme.radius.pill};
+  padding: 0.4rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: ${({ $live }) => $live ? "pointer" : "not-allowed"};
+  background: ${({ theme, $live }) => $live ? theme.colors.ink : theme.colors.backgroundAlt};
+  color: ${({ theme, $live }) => $live ? theme.colors.background : theme.colors.inkFaint};
+  transition: transform 0.12s ease, background 0.12s ease;
+
+  &:hover {
+    transform: ${({ $live }) => $live ? "scale(1.05)" : "none"};
+  }
+`;
+var LiveDot = Tt.span`
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.live};
+  animation: ${({ $animate }) => $animate ? pulse : "none"} 1.6s ease-in-out infinite;
+`;
+/**
+* Independent "Watch" indicator alongside RadioPlayer's "Listen" - see
+* docs/architecture/08-video-streaming-integration-guide.md §8.
+* video_live is a completely separate signal from audio's own on-air
+* state, and the two can be true or false in any combination.
+*
+* Purely a status pill + navigator now - it used to own a modal with real
+* HLS playback and listener-session tracking directly, but that all moved
+* to the /videos page's own hero player (see Videos.tsx/VodSection.tsx)
+* as part of the unified video-hub work, so the same "Join Live" flow
+* exists in exactly one place instead of two independent implementations.
+* Clicking this when live just navigates there.
+*
+* Renders nothing at all when the studio isn't live - previously stayed
+* mounted as a disabled/greyed pill so the header layout never shifted,
+* but per direct product feedback a permanently-visible "Watch Live"
+* control that's usually unusable read as broken/confusing rather than
+* informative. The surrounding flex layout (PlayerSlot /
+* MobileBottomPlayerBar in Layout.tsx) just collapses the space when this
+* renders null, so no layout changes were needed there.
+*/
+function WatchToggle() {
+	const [status, setStatus] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		let cancelled = false;
+		const poll = () => {
+			getVideoStreamStatus().then((result) => {
+				if (!cancelled) setStatus(result);
+			}).catch(() => {});
+		};
+		poll();
+		const handle = setInterval(poll, STATUS_POLL_MS);
+		return () => {
+			cancelled = true;
+			clearInterval(handle);
+		};
+	}, []);
+	const isLive = Boolean(status?.video_live && status.hls_url);
+	if (!isLive) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(WatchButton, {
+		type: "button",
+		$live: isLive,
+		disabled: !isLive,
+		onClick: () => isLive && router3.visit("/videos"),
+		"aria-label": isLive ? "Go watch the live video stream" : "No live video right now",
+		title: isLive ? void 0 : "No live video right now",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LiveDot, { $animate: isLive }), "Watch Live"]
+	});
+}
+//#endregion
+//#region resources/js/components/FloatingVideoPlayer.tsx
+/**
+* Mounted once in Layout.tsx (persists across Inertia navigation, same as
+* RadioPlayer/WatchToggle) - renders the one shared <video> element
+* FloatingVideoContext owns, and either docks it visually over VodSection's
+* hero-slot placeholder (`dockTarget`, when the user is on /videos) or
+* floats it in a small corner box everywhere else.
+*
+* CRITICAL: the <video> is a plain, direct child of ONE fixed DOM node
+* (`OverlayHost`, rendered unconditionally, exactly once) whose IDENTITY
+* never changes across renders - only its CSS position/size changes
+* between "docked" (matched every frame to
+* `dockTarget.getBoundingClientRect()`), "floating" (a fixed corner box)
+* and "idle" (off-screen, 0x0). This was NOT the first design tried here:
+* an earlier version used `createPortal(<video/>, dockTarget ??
+* floatingHost ?? hiddenHost)` - swapping WHICH container the SAME portal
+* targeted based on state. That turned out to be a real, verified bug:
+* React destroys and recreates a portal's children whenever the portal's
+* *container* argument changes between renders, even with an explicit
+* `key` on the portal (confirmed by instrumenting the ref callback - the
+* exact same HTMLVideoElement was never reused across a container change,
+* always torn down and rebuilt), which silently reset the video's
+* src/playback state the instant docking flipped to floating.
+* Repositioning one never-swapped, non-portalled container via CSS
+* instead is what actually survives navigation without interrupting
+* playback. See FloatingVideoContext's own docblock for why this all
+* exists in the first place.
+*/
+var OverlayHost = Tt.div`
+  position: fixed;
+  z-index: ${({ $floating }) => $floating ? 500 : 2};
+  overflow: hidden;
+  background: #000;
+  border-radius: ${({ $floating, theme }) => $floating ? theme.radius.md : 0};
+  box-shadow: ${({ $floating, theme }) => $floating ? theme.shadow.md : "none"};
+  cursor: ${({ $floating }) => $floating ? "pointer" : "default"};
+
+  video {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+`;
+var FloatingLabel = Tt.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.4rem 1.8rem 0.4rem 0.6rem;
+  background: linear-gradient(rgba(0, 0, 0, 0.75), transparent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+`;
+var CloseButton = Tt.button`
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.8);
+  }
+`;
+var FLOATING_WIDTH = 300;
+var FLOATING_ASPECT = 16 / 9;
+var FLOATING_MARGIN = 16;
+var FLOATING_MOBILE_BOTTOM_OFFSET = 78;
+var MOBILE_BREAKPOINT = 768;
+function FloatingVideoPlayer() {
+	const { active, videoRef, dockTarget, stopActive, handleEnded, handlePause } = useFloatingVideo();
+	const [dockRect, setDockRect] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		if (!dockTarget) {
+			setDockRect(null);
+			return;
+		}
+		let raf;
+		const sync = () => {
+			setDockRect(dockTarget.getBoundingClientRect());
+			raf = requestAnimationFrame(sync);
+		};
+		sync();
+		return () => cancelAnimationFrame(raf);
+	}, [dockTarget]);
+	const isDocked = !!dockTarget;
+	const isFloating = !!active && !isDocked;
+	const label = !active ? null : active.kind === "live" ? active.label : active.kind === "scheduled" ? active.label : active.video.title;
+	let style;
+	if (isDocked && dockRect) style = {
+		top: dockRect.top,
+		left: dockRect.left,
+		width: dockRect.width,
+		height: dockRect.height
+	};
+	else if (isFloating) {
+		const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+		const width = isMobile ? 190 : FLOATING_WIDTH;
+		const height = width / FLOATING_ASPECT;
+		style = {
+			left: window.innerWidth - width - (isMobile ? 12 : FLOATING_MARGIN),
+			top: window.innerHeight - height - (isMobile ? FLOATING_MOBILE_BOTTOM_OFFSET : FLOATING_MARGIN),
+			width,
+			height
+		};
+	} else style = {
+		top: 0,
+		left: 0,
+		width: 0,
+		height: 0,
+		opacity: 0,
+		pointerEvents: "none"
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(OverlayHost, {
+		$floating: isFloating,
+		style,
+		onClick: isFloating ? () => router3.visit("/videos") : void 0,
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+			ref: videoRef,
+			controls: true,
+			playsInline: true,
+			onEnded: handleEnded,
+			onPause: handlePause
+		}), isFloating && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FloatingLabel, { children: label }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseButton, {
+			type: "button",
+			onClick: (e) => {
+				e.stopPropagation();
+				stopActive();
+			},
+			"aria-label": "Close floating video",
+			children: "×"
+		})] })]
+	});
+}
+//#endregion
 //#region resources/js/components/WelcomeModal.tsx
 var STORAGE_KEY$2 = "gtr_welcome_last_shown";
 var ONE_WEEK_MS = 6048e5;
@@ -20096,7 +19941,7 @@ var Backdrop = Tt.div`
   inset: 0;
   background: rgba(15, 17, 22, 0.72);
   backdrop-filter: blur(3px);
-  z-index: 200;
+  z-index: 20000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -20875,6 +20720,73 @@ function PromoMessageBar() {
 		] })
 	});
 }
+Tt.div`
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+`;
+Tt.div`
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    position: absolute;
+`;
+Tt.input`
+    width: 250px;
+    padding: 1rem;
+    border: 1px solid #ccc;
+    outline: none;
+
+    &:focus {
+        border-color: ${({ theme }) => theme.colors.gold};
+    }
+`;
+Tt.button`
+    padding: 1rem 1.1rem;
+    border: none;
+    border-radius: ${({ theme }) => theme.radius.pill};
+    background: ${({ theme }) => theme.colors.gold};
+    color: ${({ theme }) => theme.colors.ink};
+    font-size: 0.85rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+
+    &:hover {
+        filter: brightness(1.05);
+    }
+`;
+Tt.a`
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: ${({ theme }) => theme.colors.gold};
+    color: ${({ theme }) => theme.colors.ink};
+
+    cursor: pointer;
+
+    transition: transform 0.12s ease, background 0.12s ease;
+
+    &:hover {
+        transform: scale(1.05);
+    }
+
+    svg {
+        width: 28px;
+        height: 28px;
+    }
+`;
 //#endregion
 //#region resources/js/components/Layout.tsx
 var SkipLink = Tt.a`
@@ -20895,9 +20807,15 @@ var SkipLink = Tt.a`
 var Header = Tt.header`
   background: ${({ theme }) => theme.colors.surface};
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  position: sticky;
+
+  position: fixed;
   top: 0;
-  z-index: 40;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+
+  width: 100%;
+  
 `;
 var HeaderInner = Tt.div`
   max-width: ${({ theme }) => theme.maxWidth};
@@ -20908,7 +20826,7 @@ var TopBar = Tt.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 0.9rem 0;
 `;
 var SiteName = Tt(Link)`
@@ -20930,6 +20848,10 @@ var PlayerSlot = Tt.div`
     display: none;
   }
 `;
+Tt.div`
+  display: flex;
+  min-width: 0;
+`;
 /** Hidden below tablet - MobileNavDrawer carries the same link there instead, same pattern as CategoryNav. */
 var AdvertiserActions = Tt.div`
   display: flex;
@@ -20942,7 +20864,7 @@ var AdvertiserActions = Tt.div`
   }
 `;
 var GetStartedLink = Tt.a`
-  padding: 1.0rem 1.1rem;
+  padding: 0.8rem 1rem;
   border-radius: ${({ theme }) => theme.radius.pill};
   background: ${({ theme }) => theme.colors.gold};
   color: ${({ theme }) => theme.colors.ink};
@@ -20988,6 +20910,8 @@ var Main = Tt.main`
   padding: 2rem 1.25rem 3.5rem;
   min-height: 60vh;
 
+  margin-top: 100px;
+
   @media (max-width: ${({ theme }) => theme.breakpoints.tablet}) {
     padding-bottom: calc(3.5rem + ${MOBILE_PLAYER_BAR_RESERVE});
   }
@@ -21002,7 +20926,7 @@ var FooterInner = Tt.div`
   margin: 0 auto;
   padding: 3rem 1.25rem 2.5rem;
   display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr;
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 1fr;
   gap: 2.5rem;
 
   @media (max-width: ${({ theme }) => theme.breakpoints.desktop}) {
@@ -21143,6 +21067,8 @@ var Privacy = Tt.div`
 * mini-player's audio playing across page changes.
 */
 function Layout({ children }) {
+	const { url } = usePage();
+	const isHome = url === "/";
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
 		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SkipLink, {
 			href: "#main-content",
@@ -21156,8 +21082,9 @@ function Layout({ children }) {
 					alt: "GhanaTalksRadio"
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CategoryNav, {}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Actions, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerSlot, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RadioPlayer, { compact: true }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AdvertiserActions, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GetStartedLink, {
+			isHome && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MastheadTitle, { children: "GhanaTalksRadio" }),
+			!isHome && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CategoryNav, {}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Actions, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(PlayerSlot, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RadioPlayer, { compact: true }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WatchToggle, {})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AdvertiserActions, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GetStartedLink, {
 				href: ADVERTISER_PORTAL_URLS.getStarted,
 				children: "Get started"
 			}) })] }),
@@ -21198,26 +21125,76 @@ function Layout({ children }) {
 					}, label))
 				})] })
 			] }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterCol, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FooterHeading, { children: "Explore" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterLinkList, { children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterCol, {
+				style: {
+					display: "flex",
+					flexDirection: "row",
+					gap: 20
+				},
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FooterHeading, { children: "Explore" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterLinkList, { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category",
+						children: "Categories"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category/entertainments",
+						children: "Entertainments"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/podcast",
+						children: "Podcasts"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category/lifestyle",
+						children: "Lifestyle"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category/music-video-mix",
+						children: "Music Video Mix"
+					})
+				] })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FooterHeading, { children: "\xA0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterLinkList, { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category/business",
+						children: "Business"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category/featured",
+						children: "Featured"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category/tech",
+						children: "Technology"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/category/crime",
+						children: "Crime"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/playlist",
+						children: "Playlists"
+					})
+				] })] })]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterCol, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FooterHeading, { children: "Quick Links" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterLinkList, { children: [
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
 					to: "/",
 					children: "Home"
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
-					to: "/playlist",
-					children: "Playlist"
+					to: "/about-us",
+					children: "About Us"
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
-					to: "/podcast",
-					children: "Podcast"
+					to: "/authors",
+					children: "Authors"
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
 					to: "/search",
 					children: "Search"
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
-					to: "/about-us",
-					children: "About"
+					to: "/contact-us",
+					children: "Contact Us"
 				})
 			] })] }),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(FooterCol, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FooterHeading, { children: "Get the App" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FooterLinkList, { children: APP_LINKS.map(({ label, href, Icon }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AppLinkItem, {
@@ -21236,17 +21213,22 @@ function Layout({ children }) {
 				children: "Privacy Policy"
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
-				to: "/contact-us",
-				children: "Contact Us"
+				to: "/editorial-policy",
+				children: "Editorial Policy"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/corrections-policy",
+				children: "Corrections Policy"
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
 				to: "/account-deletion",
 				children: "Delete your account"
 			})
 		] })] })] }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MobileBottomPlayerBar, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RadioPlayer, { compact: true }) }),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(MobileBottomPlayerBar, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RadioPlayer, { compact: true }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WatchToggle, {})] }),
 		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(WelcomeModal, {}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CookieBanner, {})
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CookieBanner, {}),
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FloatingVideoPlayer, {})
 	] });
 }
 //#endregion
@@ -21280,31 +21262,36 @@ server_default((page) => {
 	return createInertiaApp({
 		page,
 		resolve: (name) => resolvePage(name, /* #__PURE__ */ Object.assign({
-			"./pages/AccountDeletion.tsx": () => import("./assets/AccountDeletion-B9ygToVH.js"),
-			"./pages/CategoryArchive.tsx": () => import("./assets/CategoryArchive-B0TLfkVb.js"),
-			"./pages/ContactUs.tsx": () => import("./assets/ContactUs-B5WCx80-.js"),
-			"./pages/Home.tsx": () => import("./assets/Home-DtvAbKq0.js"),
-			"./pages/Leaderboard.tsx": () => import("./assets/Leaderboard-BA3n7l2n.js"),
-			"./pages/Playlist.tsx": () => import("./assets/Playlist-hz73laDy.js"),
-			"./pages/Podcast.tsx": () => import("./assets/Podcast-hcOCTE5m.js"),
-			"./pages/PodcastEpisodeDetail.tsx": () => import("./assets/PodcastEpisodeDetail-yd5FAkZZ.js"),
-			"./pages/PodcastShow.tsx": () => import("./assets/PodcastShow-UJ5g7xNT.js"),
-			"./pages/PredictionDetail.tsx": () => import("./assets/PredictionDetail-CVUgquOV.js"),
-			"./pages/Predictions.tsx": () => import("./assets/Predictions-BVEbL8i4.js"),
-			"./pages/QuizDetail.tsx": () => import("./assets/QuizDetail-DAHDo87N.js"),
-			"./pages/Quizzes.tsx": () => import("./assets/Quizzes-DPV93AZS.js"),
-			"./pages/Raffle.tsx": () => import("./assets/Raffle-BoBThPtj.js"),
-			"./pages/Search.tsx": () => import("./assets/Search-Bt6twO5L.js"),
-			"./pages/SinglePost.tsx": () => import("./assets/SinglePost-DlXiKY1X.js"),
-			"./pages/StaticPage.tsx": () => import("./assets/StaticPage-BiI0mMLw.js"),
-			"./pages/Videos.tsx": () => import("./assets/Videos-kPnx3QG6.js"),
-			"./pages/careers/JobDetail.tsx": () => import("./assets/JobDetail-eJym5bbo.js"),
-			"./pages/careers/Search.tsx": () => import("./assets/Search-DFGdeWJR.js"),
-			"./pages/careers/SeoLanding.tsx": () => import("./assets/SeoLanding-DsCG7QH6.js")
+			"./pages/AboutUs.tsx": () => import("./assets/AboutUs-Br2WH2PC.js"),
+			"./pages/AccountDeletion.tsx": () => import("./assets/AccountDeletion-C-ZdrOMv.js"),
+			"./pages/Authors.tsx": () => import("./assets/Authors-CwNUSM4G.js"),
+			"./pages/CategoryArchive.tsx": () => import("./assets/CategoryArchive-D5xSPLWu.js"),
+			"./pages/CategoryIndex.tsx": () => import("./assets/CategoryIndex-DzKOq-qU.js"),
+			"./pages/ContactUs.tsx": () => import("./assets/ContactUs-CvdSpevc.js"),
+			"./pages/CorrectionsPolicy.tsx": () => import("./assets/CorrectionsPolicy-CPPdSA6E.js"),
+			"./pages/EditorialPolicy.tsx": () => import("./assets/EditorialPolicy-BiZbUUlw.js"),
+			"./pages/Home.tsx": () => import("./assets/Home-mLustE0-.js"),
+			"./pages/Leaderboard.tsx": () => import("./assets/Leaderboard-DaqS7qa8.js"),
+			"./pages/Playlist.tsx": () => import("./assets/Playlist-BoWxfdXi.js"),
+			"./pages/Podcast.tsx": () => import("./assets/Podcast-XkinHo-e.js"),
+			"./pages/PodcastEpisodeDetail.tsx": () => import("./assets/PodcastEpisodeDetail-BJYcI3k6.js"),
+			"./pages/PodcastShow.tsx": () => import("./assets/PodcastShow-CtfQ1pOF.js"),
+			"./pages/PredictionDetail.tsx": () => import("./assets/PredictionDetail-x8TrvfL9.js"),
+			"./pages/Predictions.tsx": () => import("./assets/Predictions-DneOpS1y.js"),
+			"./pages/QuizDetail.tsx": () => import("./assets/QuizDetail-BnnCV3nz.js"),
+			"./pages/Quizzes.tsx": () => import("./assets/Quizzes-JiIwOCKD.js"),
+			"./pages/Raffle.tsx": () => import("./assets/Raffle-DGso4NOV.js"),
+			"./pages/Search.tsx": () => import("./assets/Search-DkxSyJW_.js"),
+			"./pages/SinglePost.tsx": () => import("./assets/SinglePost-BTklIudb.js"),
+			"./pages/StaticPage.tsx": () => import("./assets/StaticPage-BJUSqcL5.js"),
+			"./pages/Videos.tsx": () => import("./assets/Videos-Bdhh_zAQ.js"),
+			"./pages/careers/JobDetail.tsx": () => import("./assets/JobDetail-DXGirFt4.js"),
+			"./pages/careers/Search.tsx": () => import("./assets/Search-DQz8_F4b.js"),
+			"./pages/careers/SeoLanding.tsx": () => import("./assets/SeoLanding-Cmd8CHn-.js")
 		})),
 		setup: ({ App, props }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(bt, {
 			theme,
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobalStyle, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AudioPlayerProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(App, { ...props }) })]
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobalStyle, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AudioPlayerProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FloatingVideoProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(App, { ...props }) }) })]
 		}),
 		render: (app) => {
 			const sheet = new Ut();

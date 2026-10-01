@@ -6,6 +6,7 @@ use App\Http\Controllers\CareersController;
 use App\Http\Controllers\CareersJobDetailController;
 use App\Http\Controllers\CareersLandingController;
 use App\Http\Controllers\CategoryArchiveController;
+use App\Http\Controllers\CategoryIndexController;
 use App\Http\Controllers\ContactUsController;
 use App\Http\Controllers\AboutUsController;
 use App\Http\Controllers\HomeController;
@@ -36,6 +37,7 @@ Route::get('/.well-known/apple-app-site-association', [AppLinksController::class
 Route::get('/.well-known/assetlinks.json', [AppLinksController::class, 'assetLinks']);
 
 Route::get('/', HomeController::class)->name('home');
+Route::get('/category', CategoryIndexController::class)->name('category.index');
 Route::get('/category/{slug}', CategoryArchiveController::class)->name('category.archive');
 Route::get('/post/{slug}', SinglePostController::class)->name('post.show');
 Route::get('/search', SearchController::class)->name('search');

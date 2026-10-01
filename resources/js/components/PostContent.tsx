@@ -26,6 +26,10 @@ const Prose = styled.div`
   h3 { font-size: 1.2rem; }
 
   img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
     border-radius: ${({ theme }) => theme.radius.md};
     margin: 1.5em 0;
   }
@@ -79,6 +83,14 @@ const Prose = styled.div`
  * confirmed present in real posts). If you don't want arbitrary iframes
  * from old/compromised posts rendering, tighten ALLOWED_TAGS below and
  * post-process embeds into a dedicated component instead.
+ *
+ * `srcset`/`sizes` stripped from inline images: WP's own responsive-image
+ * output (`wp_calculate_image_sizes()`) hints a fixed CSS width like
+ * `(max-width: 1024px) 100vw, 1024px` based on that image's originally
+ * uploaded size - confirmed live, this was overriding this column's own
+ * (narrower) actual width, making the image render smaller than the
+ * column instead of filling it. Dropping both attributes leaves the
+ * plain `src` in charge, sized purely by Prose's own `img` rule below.
  */
 export function PostContent({ html, className }: PostContentProps) {
   const clean = useMemo(
@@ -92,6 +104,7 @@ export function PostContent({ html, className }: PostContentProps) {
           'referrerpolicy',
           'target',
         ],
+        FORBID_ATTR: ['srcset', 'sizes'],
       }),
     [html]
   );

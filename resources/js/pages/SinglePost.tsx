@@ -21,11 +21,11 @@ interface SinglePostProps {
   post: WPPost | null;
   /** Absolute URL of this page, resolved server-side (Request::url()) - no `window` during SSR. */
   url: string;
-  banner: BannerDto | null;
+  banners?: BannerDto[];
 }
 
 const Article = styled.article`
-  max-width: ${({ theme }) => theme.contentWidth};
+  max-width: ${({ theme }) => theme.maxWidth};
   margin: 0 auto;
   background: ${({ theme }) => theme.colors.surface};
   border-radius: ${({ theme }) => theme.radius.md};
@@ -35,6 +35,19 @@ const Article = styled.article`
   @media (max-width: ${({ theme }) => theme.breakpoints.tablet}) {
     border-radius: ${({ theme }) => theme.radius.sm};
   }
+`;
+
+/**
+ * Everything readable (headline, byline, both the featured image and any
+ * images inside the body, paragraphs, share bar, ads) lives at ONE
+ * consistent width - Article above stays as wide as the header only for
+ * its background/card, never for content directly. Mixing a wide
+ * featured image with a narrower body column was the actual bug reported
+ * live: it read as "only the banner got wider," not a real fix.
+ */
+const ArticleInner = styled.div`
+  // max-width: ${({ theme }) => theme.contentWidth};
+  margin: 0 auto;
 `;
 
 const BackLink = styled(Link)`
@@ -103,14 +116,16 @@ const StateBox = styled.div`
  * original) is replaced with `url`, resolved from the request server-side
  * since there's no `window` during SSR.
  */
-export function SinglePost({ post, url, banner }: SinglePostProps) {
+export function SinglePost({ post, url, banners }: SinglePostProps) {
   if (!post) {
     return (
       <Article>
         <Head>
           <title>Story not found | GhanaTalksRadio</title>
         </Head>
-        <StateBox role="alert">This story doesn't exist or may have been removed.</StateBox>
+        <ArticleInner>
+          <StateBox role="alert">This story doesn't exist or may have been removed.</StateBox>
+        </ArticleInner>
       </Article>
     );
   }
@@ -151,43 +166,45 @@ export function SinglePost({ post, url, banner }: SinglePostProps) {
   return (
     <Article>
       <Head>
-        <title>{`${title} | GhanaTalksRadio`}</title>
-        <meta name="description" content={description} />
-        <link rel="canonical" href={url} />
-        <meta property="og:site_name" content="GhanaTalksRadio" />
+        {/* title/description/canonical/og:site_name/og:title/og:description/og:image/og:url/
+            twitter:* are deliberately NOT declared here - app.blade.php already renders all of
+            them unconditionally via PageMeta::set()/canonicalUrl() (same values: SinglePostController
+            now calls PageMeta::truncatedTitle(), the same length-aware logic pageTitle below used
+            to compute client-side only). A duplicate declaration here isn't just redundant: the
+            blade-rendered tag is what crawlers actually read (confirmed live - Bing's URL
+            Inspection flagged "Title too long" because it was reading app.blade.php's unconditionally-
+            suffixed title, not this component's length-aware pageTitle, which never won), and
+            Google's documented behavior for a duplicate rel=canonical - even an identical one - is to
+            distrust the site's signal entirely and pick a canonical algorithmically instead. Only
+            og:type (blade always says "website", not "article") and article:published_time have no
+            blade equivalent and stay here. */}
         <meta property="og:type" content="article" />
-        <meta property="og:title" content={title} />
-        <meta property="og:description" content={description} />
-        {imageUrl && <meta property="og:image" content={imageUrl} />}
-        <meta property="og:url" content={url} />
         <meta property="article:published_time" content={post.date_gmt} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={title} />
-        <meta name="twitter:description" content={description} />
-        {imageUrl && <meta name="twitter:image" content={imageUrl} />}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: articleJsonLd }} />
       </Head>
 
-      <BackLink to="/">← Back to stories</BackLink>
+      <ArticleInner>
+        <BackLink to="/">← Back to stories</BackLink>
 
-      {categories[0] && (
-        <Eyebrow to={`/category/${categories[0].slug}`}>{categories[0].name}</Eyebrow>
-      )}
-      <Title>{title}</Title>
-      <Meta>
-        <span>{getAuthorName(post)}</span>
-        <span aria-hidden="true">·</span>
-        <span>{formatPostDate(post.date)}</span>
-      </Meta>
+        {categories[0] && (
+          <Eyebrow to={`/category/${categories[0].slug}`}>{categories[0].name}</Eyebrow>
+        )}
+        <Title>{title}</Title>
+        <Meta>
+          <span>{getAuthorName(post)}</span>
+          <span aria-hidden="true">·</span>
+          <span>{formatPostDate(post.date)}</span>
+        </Meta>
 
-      {imageUrl && <FeaturedImage src={imageUrl} alt={media?.alt_text || title} />}
+        {imageUrl && <FeaturedImage src={imageUrl} alt={media?.alt_text || title} />}
 
-      <PostContent html={post.content.rendered} />
+        <PostContent html={post.content.rendered} />
 
-      <ShareBar url={url} title={title} />
+        <ShareBar url={url} title={title} />
 
-      <SponsoredBanner banner={banner} />
-      <AdSlot format="in-article" slotId={GTR_AD_SLOTS.inArticle} />
+        <SponsoredBanner banners={banners} />
+        <AdSlot format="in-article" slotId={GTR_AD_SLOTS.inArticle} />
+      </ArticleInner>
     </Article>
   );
 }

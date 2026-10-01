@@ -5,6 +5,7 @@ import { ThemeProvider, ServerStyleSheet } from 'styled-components';
 import { theme } from './styles/theme';
 import { GlobalStyle } from './styles/GlobalStyle';
 import { AudioPlayerProvider } from './context/AudioPlayerContext';
+import { FloatingVideoProvider } from './context/FloatingVideoContext';
 import { resolvePage } from './routing/resolvePage';
 
 createServer((page) => {
@@ -19,7 +20,9 @@ createServer((page) => {
       <ThemeProvider theme={theme}>
         <GlobalStyle />
         <AudioPlayerProvider>
-          <App {...props} />
+          <FloatingVideoProvider>
+            <App {...props} />
+          </FloatingVideoProvider>
         </AudioPlayerProvider>
       </ThemeProvider>
     ),

@@ -2,3 +2,16 @@ Sitemap: https://ghanatalksradio.com/sitemap-index.xml
 
 User-agent: *
 Allow: /
+
+# Legacy WordPress artifacts with no equivalent content on this site -
+# confirmed via a Search Console Coverage export showing these patterns
+# as permanent 404s with no post/page behind them (unlike single-segment
+# slug/numeric-ID legacy URLs, which DO redirect to real content via
+# LegacyPostRedirectController and must stay crawlable for that redirect
+# to be discovered). www.ghanatalksradio.com and
+# wordpress.ghanatalksradio.com both redirect their own robots.txt here,
+# so this applies to all three legacy/current origins at once.
+Disallow: /page/
+Disallow: /tag/
+Disallow: /2019login
+Disallow: /log-in

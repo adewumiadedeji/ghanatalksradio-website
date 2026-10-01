@@ -28,7 +28,7 @@ class PodcastEpisodeDetailController extends Controller
 
         return Inertia::render('PodcastEpisodeDetail', [
             'episode' => $episode,
-            'banner' => $portal->fetchBanners('web_podcast_episode')[0] ?? null,
+            'banners' => $portal->fetchBanners('web_podcast_episode'),
         ]);
     }
 }

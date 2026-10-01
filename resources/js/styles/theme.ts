@@ -36,6 +36,9 @@ export const theme = {
     display: `'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
     body: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
     mono: `'JetBrains Mono', 'SF Mono', Menlo, monospace`,
+    /** Editorial masthead/headline face for the redesigned Home page only -
+     * everywhere else keeps `display` (Space Grotesk) unchanged. */
+    serif: `'Source Serif 4', Georgia, 'Times New Roman', serif`,
   },
   radius: {
     sm: '8px',

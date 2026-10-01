@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
+import { usePage } from '@inertiajs/react';
 import { Link } from '../routing/Link';
 import styled from 'styled-components';
 import { CategoryNav } from './CategoryNav';
 import { MobileNavDrawer } from './MobileNavDrawer';
 import { RadioPlayer } from './RadioPlayer';
 import { WatchToggle } from './WatchToggle';
+import { FloatingVideoPlayer } from './FloatingVideoPlayer';
 import { AdSlot, GTR_AD_SLOTS } from './AdSlot';
 import { APP_LINKS, SOCIAL_LINKS } from './footerLinks';
 import { WelcomeModal } from './WelcomeModal';
@@ -13,6 +15,7 @@ import { PromoMessageBar } from './PromoMessageBar';
 import { ADVERTISER_PORTAL_URLS } from '../config/advertiserPortal';
 import logoUrl from '../assets/logo.png';
 import Search from './Search';
+import { MastheadTitle } from './HomeEditorial';
 
 const SkipLink = styled.a`
   position: absolute;
@@ -320,6 +323,15 @@ const Privacy = styled.div`
  * mini-player's audio playing across page changes.
  */
 export function Layout({ children }: { children: ReactNode }) {
+  // Home renders its own masthead + sub-nav (HomeEditorial's HomeMasthead) as
+  // page content below this same persistent header - showing CategoryNav
+  // here too would just duplicate those same links. Only CategoryNav is
+  // conditional; RadioPlayer/WatchToggle/Search/Get-started below stay in
+  // this exact position on every page, including Home, since those hold
+  // real playback state that must never remount on navigation.
+  const { url } = usePage();
+  const isHome = url === '/';
+
   return (
     <>
       <SkipLink href="#main-content">Skip to content</SkipLink>
@@ -330,7 +342,8 @@ export function Layout({ children }: { children: ReactNode }) {
             <SiteName to="/">
               <Logo src={logoUrl} alt="GhanaTalksRadio" />
             </SiteName>
-            <CategoryNav />
+            {isHome && <MastheadTitle>GhanaTalksRadio</MastheadTitle>}
+            {!isHome && <CategoryNav />}
             <Actions>
               
               <PlayerSlot>
@@ -340,9 +353,9 @@ export function Layout({ children }: { children: ReactNode }) {
               <AdvertiserActions>
                 <GetStartedLink href={ADVERTISER_PORTAL_URLS.getStarted}>Get started</GetStartedLink>
               </AdvertiserActions>
-              <SearchSlot>
+              {/* <SearchSlot>
                 <Search />
-              </SearchSlot>
+              </SearchSlot> */}
             </Actions>
             <MobileNavDrawer />
           </TopBar>
@@ -389,11 +402,11 @@ export function Layout({ children }: { children: ReactNode }) {
             <div>
               <FooterHeading>Explore</FooterHeading>
               <FooterLinkList>
-                <Link to="/">Categories</Link>
+                <Link to="/category">Categories</Link>
                 <Link to="/category/entertainments">Entertainments</Link>
                 <Link to="/podcast">Podcasts</Link>
                 <Link to="/category/lifestyle">Lifestyle</Link>
-                <Link to="/playlist">Playlists</Link>
+                <Link to="/category/music-video-mix">Music Video Mix</Link>
               </FooterLinkList>
             </div>
             <div>
@@ -451,6 +464,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <WelcomeModal />
       <CookieBanner />
+      <FloatingVideoPlayer />
     </>
   );
 }

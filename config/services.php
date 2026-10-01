@@ -68,7 +68,18 @@ return [
         // IndexNowService. Not a secret in the security sense (it's
         // served back publicly at public/{key}.txt to prove domain
         // ownership); it just needs to stay in sync with that file.
+        //
+        // 'key' (INDEXNOW_KEY) is left alone - reserved for whatever it's
+        // already being used for elsewhere - and 'bing_key'
+        // (INDEXNOW_BING_KEY) is the real key IndexNowService actually
+        // submits with, issued directly from Bing Webmaster Tools, with
+        // its own matching public/{key}.txt already deployed. Deliberately
+        // two separate values, not one shared key, per explicit product
+        // decision - even though the indexnow.org protocol itself doesn't
+        // require per-platform keys (one key can serve Bing and Yandex
+        // both), this keeps them from ever colliding again.
         'key' => env('INDEXNOW_KEY'),
+        'bing_key' => env('INDEXNOW_BING_KEY'),
     ],
 
     /*

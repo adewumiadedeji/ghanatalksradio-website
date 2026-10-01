@@ -2,8 +2,7 @@ import { Head } from '@inertiajs/react';
 import styled from 'styled-components';
 import type { WPPost } from '../types/wordpress';
 import { Link } from '../routing/Link';
-import { Hero } from '../components/Hero';
-import { PostList } from '../components/PostList';
+import { HomeMasthead, NewsTicker, HomeHeroBlock, WeeklyStoriesSection, MultimediaDeskSection } from '../components/HomeEditorial';
 import { PostCard } from '../components/PostCard';
 import { CompactPostList } from '../components/CompactPostList';
 import { PostRail } from '../components/PostRail';
@@ -24,7 +23,11 @@ import { PodcastCard } from '../components/PodcastCard';
 const YOUTUBE_TEASER_COUNT = 4;
 
 interface HomeProps {
-  banner: BannerDto | null;
+  banners?: BannerDto[];
+  secondaryBanners?: BannerDto[];
+  houseHorizontalBanners?: BannerDto[];
+  houseVerticalBanners?: BannerDto[];
+  houseSquareBanners?: BannerDto[];
   engagementBanners: EngagementBannerDto[];
   heroPosts: WPPost[];
   topGridPosts: WPPost[];
@@ -38,10 +41,6 @@ interface HomeProps {
   youtubeVideos: YoutubeVideoDto[];
   youtubeError: boolean;
 }
-
-const HeroSection = styled.section`
-  margin-bottom: 2.5rem;
-`;
 
 const SectionHead = styled.div`
   display: flex;
@@ -65,6 +64,16 @@ const SectionAccent = styled.span`
   height: 3px;
   background: ${({ theme }) => theme.colors.gold};
   margin-right: 0.6rem;
+`;
+
+/** Caps the secondary banner slot to a real 728x90 Leaderboard's own
+    width, since SponsoredBanner itself now always fills 100% of whatever
+    container it's placed in - the main hero slot above wants that
+    full-bleed behavior, this one deliberately doesn't (a 728px-sized
+    creative would render blurry stretched any wider). */
+const SecondaryBannerWrap = styled.div`
+  max-width: 728px;
+  margin: 0 auto;
 `;
 
 const SeeAllLink = styled(Link)`
@@ -168,7 +177,11 @@ function CategorySection({
  * first response.
  */
 export function Home({
-  banner,
+  banners,
+  secondaryBanners,
+  houseHorizontalBanners,
+  houseVerticalBanners,
+  houseSquareBanners,
   engagementBanners,
   heroPosts,
   topGridPosts,
@@ -193,12 +206,25 @@ export function Home({
         />
       </Head>
 
-      <HeroSection>
-        <Hero posts={heroPosts} isLoading={false} />
-      </HeroSection>
+      <HomeMasthead />
+       <SponsoredBanner banners={banners} />
+      <SecondaryBannerWrap>
+        <SponsoredBanner banners={secondaryBanners} />
+      </SecondaryBannerWrap>
+      <NewsTicker posts={heroPosts} />
+      <HomeHeroBlock
+        heroPosts={heroPosts}
+        mostRead={trendingPosts}
+        subStories={heroPosts.slice(1, 4)}
+        engagementBanners={engagementBanners}
+      />
 
-      <SponsoredBanner banner={banner} />
+
       <AdSlot format="leaderboard" slotId={GTR_AD_SLOTS.vertical} />
+      {/* GTR's own internal-program promotion (web_house_horizontal) -
+          shape-matched to this full-width strip position, distinct from
+          the advertiser AdSlot right above it. */}
+      <SponsoredBanner banners={houseHorizontalBanners} />
 
       <SectionHead>
         <SectionTitle>
@@ -217,35 +243,32 @@ export function Home({
         <TrendingPanel>
           <SectionTitle style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>Trending</SectionTitle>
           <CompactPostList posts={trendingPosts} isLoading={false} />
+          {/* web_house_vertical - a 300x600 shape fits this narrow
+              sidebar column naturally, right where the equivalent
+              advertiser Half Page size would go. */}
+          <SponsoredBanner banners={houseVerticalBanners} />
         </TrendingPanel>
       </SplitZone>
 
-  
-
-      <SplitZone style={{marginTop: 10}}>
-         <CategorySection
-            title="Entertainment"
-            categorySlug="entertainment"
-            seeAllHref="/category/entertainment"
-            hasPosts={entertainmentPosts.length > 0}
-          >
-            <PostRail posts={entertainmentPosts} isLoading={false} />
-          </CategorySection> 
-
-        <TrendingPanel>
-          <EngagementBannerStrip banners={engagementBanners} />
-        </TrendingPanel>
-      </SplitZone>
-      
-      
       <CategorySection
-        title="Sports"
-        categorySlug="sports"
-        seeAllHref="/category/sports"
-        hasPosts={sportsPosts.length > 0}
+        title="Entertainment"
+        categorySlug="entertainment"
+        seeAllHref="/category/entertainment"
+        hasPosts={entertainmentPosts.length > 0}
       >
-        <PostRail posts={sportsPosts} isLoading={false} />
+        <PostRail posts={entertainmentPosts} isLoading={false} />
       </CategorySection>
+
+      {/* web_house_square - a compact 250x250/150x150 shape as its own
+          centered breathing-room slot between sections, rather than
+          forced into a grid/sidebar it wasn't sized for. */}
+      <SponsoredBanner banners={houseSquareBanners} />
+
+      <WeeklyStoriesSection
+        title="Sports"
+        subtitle="The scores, signings and storylines from the pitches, courts and tracks this week."
+        posts={sportsPosts}
+      />
 
       <CategorySection
         title="Lifestyle"
@@ -295,15 +318,7 @@ export function Home({
         </Section>
       )}
 
-      <Section>
-        <SectionHead>
-          <SectionTitle>
-            <SectionAccent />
-            More Stories
-          </SectionTitle>
-        </SectionHead>
-        <PostList posts={riverPosts} isLoading={false} isError={false} />
-      </Section>
+      <MultimediaDeskSection posts={riverPosts} trending={trendingPosts} />
     </>
   );
 }

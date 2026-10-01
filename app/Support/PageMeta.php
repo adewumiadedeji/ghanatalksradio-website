@@ -66,11 +66,41 @@ class PageMeta
      * WhatsApp/Facebook truncate og:description themselves anyway, but at
      * a fixed byte count that can cut mid-tag if we hand them raw HTML.
      */
-    public static function plainText(string $html, int $limit = 200): string
+    public static function plainText(string $html, int $limit = 150): string
     {
         $text = trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5));
         $text = preg_replace('/\s+/', ' ', $text) ?? $text;
 
         return mb_strlen($text) > $limit ? mb_substr($text, 0, $limit - 1).'…' : $text;
+    }
+
+    /**
+     * Appends $suffix only if the result stays within $maxLength - Bing
+     * flags anything longer as a "Title too long" quality issue. The site
+     * name suffix is a nice-to-have, so the first thing this drops is the
+     * suffix, not the headline.
+     *
+     * But a real headline can exceed $maxLength entirely on its own, with
+     * no suffix involved at all - confirmed live via Bing's URL Inspection
+     * tool still flagging "Title too long" on an article whose raw
+     * headline alone was 86 characters, well past 70, even with the
+     * suffix correctly dropped. Search engines truncate an overlong title
+     * in their own SERP display anyway (usually mid-word, with their own
+     * "..."), so sending an already-appropriately-truncated title is
+     * standard practice, not a loss of information - falls back to
+     * truncating the headline itself (with an ellipsis) only when even
+     * that alone doesn't fit.
+     */
+    public static function truncatedTitle(string $rawTitle, string $suffix = ' | GhanaTalksRadio', int $maxLength = 70): string
+    {
+        if (mb_strlen($rawTitle) + mb_strlen($suffix) <= $maxLength) {
+            return $rawTitle.$suffix;
+        }
+
+        if (mb_strlen($rawTitle) <= $maxLength) {
+            return $rawTitle;
+        }
+
+        return mb_substr($rawTitle, 0, $maxLength - 1).'…';
     }
 }

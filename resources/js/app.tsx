@@ -4,6 +4,7 @@ import { ThemeProvider } from 'styled-components';
 import { theme } from './styles/theme';
 import { GlobalStyle } from './styles/GlobalStyle';
 import { AudioPlayerProvider } from './context/AudioPlayerContext';
+import { FloatingVideoProvider } from './context/FloatingVideoContext';
 import { resolvePage } from './routing/resolvePage';
 
 createInertiaApp({
@@ -13,7 +14,9 @@ createInertiaApp({
       <ThemeProvider theme={theme}>
         <GlobalStyle />
         <AudioPlayerProvider>
-          <App {...props} />
+          <FloatingVideoProvider>
+            <App {...props} />
+          </FloatingVideoProvider>
         </AudioPlayerProvider>
       </ThemeProvider>
     );

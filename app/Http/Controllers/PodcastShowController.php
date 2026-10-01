@@ -45,7 +45,7 @@ class PodcastShowController extends Controller
             'page' => $page,
             'totalPages' => $result['totalPages'],
             'isError' => $isError,
-            'banner' => $portal->fetchBanners('web_podcast_series')[0] ?? null,
+            'banners' => $portal->fetchBanners('web_podcast_series'),
         ]);
     }
 }

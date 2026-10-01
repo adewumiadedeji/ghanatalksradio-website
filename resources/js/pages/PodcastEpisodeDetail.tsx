@@ -11,7 +11,7 @@ import type { BannerDto } from '../types/advertising';
 
 interface PodcastEpisodeDetailProps {
   episode: PodcastEpisode | null;
-  banner: BannerDto | null;
+  banners?: BannerDto[];
 }
 
 const BackLink = styled(Link)`
@@ -175,7 +175,7 @@ const StateBox = styled.div`
  * missing. Uses EpisodePlayer from PodcastAudioPlayer.tsx (the extracted,
  * non-live-stream subset of the SPA's RadioPlayer.tsx).
  */
-export function PodcastEpisodeDetail({ episode, banner }: PodcastEpisodeDetailProps) {
+export function PodcastEpisodeDetail({ episode, banners }: PodcastEpisodeDetailProps) {
   if (!episode) {
     return (
       <>
@@ -258,7 +258,7 @@ export function PodcastEpisodeDetail({ episode, banner }: PodcastEpisodeDetailPr
         </Section>
       )}
 
-      <SponsoredBanner banner={banner} />
+      <SponsoredBanner banners={banners} />
       <AdSlot format="in-article" slotId={GTR_AD_SLOTS.inArticle} />
     </>
   );

@@ -28,10 +28,20 @@ class IndexNowService
 
     private readonly ?string $key;
 
-    /** Config read directly in a no-arg constructor - same pattern as PortalApiClient - since Laravel's container can't auto-resolve a plain scalar constructor argument without an explicit binding. */
+    /**
+     * Config read directly in a no-arg constructor - same pattern as
+     * PortalApiClient - since Laravel's container can't auto-resolve a
+     * plain scalar constructor argument without an explicit binding.
+     *
+     * Deliberately 'bing_key' (INDEXNOW_BING_KEY), not 'key'
+     * (INDEXNOW_KEY) - see config/services.php's own docblock. 'key' is
+     * reserved for something else already using that value; this is the
+     * dedicated key actually issued by Bing Webmaster Tools for this
+     * protocol, with its own matching public/{key}.txt deployed.
+     */
     public function __construct()
     {
-        $this->key = config('services.indexnow.key');
+        $this->key = config('services.indexnow.bing_key');
     }
 
     public function isEnabled(): bool

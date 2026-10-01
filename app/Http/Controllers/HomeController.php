@@ -125,7 +125,25 @@ class HomeController extends Controller
         }
 
         return Inertia::render('Home', [
-            'banner' => $portal->fetchBanners('web_home')[0] ?? null,
+            // Full arrays, not [0] ?? null - more than one active
+            // campaign/creative can legitimately target the same
+            // placement at once, and SponsoredBanner.tsx rotates through
+            // all of them instead of only ever showing one.
+            'banners' => $portal->fetchBanners('web_home'),
+            // Secondary, narrower strip for a 728x90-sized creative - the
+            // main hero slot above now stretches full-width, so a
+            // smaller/older creative belongs here instead of being
+            // stretched blurry in that one - see PlacementKey::WebHomeSecondary.
+            'secondaryBanners' => $portal->fetchBanners('web_home_secondary'),
+            // GTR's own internal-program banners (raffle/prediction/quiz-
+            // style self-promotion, but for any internal program) -
+            // dedicated placements, deliberately never competing with the
+            // advertiser banner above for the same slot. Named by shape,
+            // not page - see PlacementKey's own docblock and where each
+            // renders in Home.tsx.
+            'houseHorizontalBanners' => $portal->fetchBanners('web_house_horizontal'),
+            'houseVerticalBanners' => $portal->fetchBanners('web_house_vertical'),
+            'houseSquareBanners' => $portal->fetchBanners('web_house_square'),
             'engagementBanners' => $portal->fetchEngagementBanners(),
             'heroPosts' => $heroPosts,
             'topGridPosts' => $topGridPosts,

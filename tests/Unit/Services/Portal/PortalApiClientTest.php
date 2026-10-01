@@ -51,6 +51,24 @@ class PortalApiClientTest extends TestCase
         $this->assertSame([], (new PortalApiClient)->fetchBanners('web_home'));
     }
 
+    /**
+     * Real crash found live: a 200/2xx response shaped like a Laravel
+     * validation-error body ({message, errors}, no 'status' or 'data' key
+     * at all - e.g. hit via an unknown `placement` value the portal
+     * doesn't recognize yet) previously reached `return $json['data']`
+     * unguarded and threw an uncaught "Undefined array key 'data'"
+     * ErrorException, not the PortalApiException every caller already
+     * catches - taking the whole page down instead of failing soft to [].
+     */
+    public function test_fetch_banners_fails_soft_on_a_response_with_no_data_key(): void
+    {
+        Http::fake([
+            'portal.test/*' => Http::response(['message' => 'The selected placement is invalid.', 'errors' => ['placement' => ['The selected placement is invalid.']]], 200),
+        ]);
+
+        $this->assertSame([], (new PortalApiClient)->fetchBanners('web_video'));
+    }
+
     public function test_fetch_promo_messages_fails_soft_on_non_2xx_response(): void
     {
         Http::fake([

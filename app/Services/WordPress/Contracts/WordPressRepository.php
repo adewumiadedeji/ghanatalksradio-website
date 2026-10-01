@@ -26,6 +26,19 @@ interface WordPressRepository
     public function getPostBySlug(string $slug): ?array;
 
     /**
+     * Looks a post up by its numeric WordPress ID - only used by
+     * LegacyPostRedirectController for the numeric permalink fallback
+     * WordPress always exposes alongside a post's pretty-permalink slug
+     * (/{id}/), independent of the slug. Years of old backlinks, RSS
+     * entries, and social shares reference this form directly, and
+     * without a way to resolve it, every one of those URLs dead-ends in
+     * a 404 instead of recovering to the real /post/{slug} page - found
+     * live via a Search Console Coverage export showing exactly this
+     * pattern. Same shape as getPostBySlug().
+     */
+    public function getPostById(int $id): ?array;
+
+    /**
      * A static WordPress Page (wp/v2/pages), not a Post - used for
      * Privacy Policy and similar legal/static content that lives as a
      * real WP page in the CMS but has no post_type=post/category of its
