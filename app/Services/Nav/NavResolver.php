@@ -52,10 +52,17 @@ class NavResolver
             ];
         }
 
+        // Deliberately NOT restricted to top-level (parent === 0)
+        // categories - a real bug found live: a subcategory (e.g. a
+        // "News" child like "Education") was being dropped from the nav
+        // entirely, neither placed in a STRUCTURE group nor falling into
+        // overflow, just because it has a parent. A live category with no
+        // other home belongs in "More" regardless of its depth in the WP
+        // taxonomy - the alternative is a real, published, linked-from-
+        // elsewhere category page that's unreachable from the nav at all.
         $overflow = [];
         foreach ($liveCategories as $cat) {
-            $isTopLevel = (int) ($cat['parent'] ?? 0) === 0;
-            if ($isTopLevel && ! in_array($cat['slug'], $placedSlugs, true) && ! self::isHiddenCategory($cat['name'])) {
+            if (! in_array($cat['slug'], $placedSlugs, true) && ! self::isHiddenCategory($cat['name'])) {
                 $overflow[] = ['label' => $cat['name'], 'slug' => $cat['slug']];
             }
         }

@@ -3,9 +3,11 @@
 namespace App\Services\WordPress;
 
 use App\Services\WordPress\Contracts\WordPressRepository;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Server-side port of the old Vite SPA's src/api/{wpClient,posts,categories}.ts.
@@ -57,25 +59,26 @@ class WordPressApiClient implements WordPressRepository
         ], $params);
 
         return Cache::remember('wp_api:posts:'.http_build_query($query), self::CACHE_TTL_SECONDS, function () use ($query) {
-            $response = $this->http()->get("{$this->baseUrl}/posts", $query);
-
-            return $this->toCollection($response);
+            return $this->toCollection($this->safeGet("{$this->baseUrl}/posts", $query));
         });
     }
 
-    public function getPostsByCategory(int $categoryId, array $params = []): array
+    public function getPostsByCategory(int|array $categoryId, array $params = []): array
     {
-        return $this->getPosts(array_merge($params, ['categories' => $categoryId]));
+        // WP REST's `categories` param wants a comma-separated string for
+        // an OR match across multiple IDs, not PHP's array-bracket query
+        // syntax - same convention already used by getVideoSourcePosts().
+        $categories = is_array($categoryId) ? implode(',', $categoryId) : $categoryId;
+
+        return $this->getPosts(array_merge($params, ['categories' => $categories]));
     }
 
     public function getCategoryBySlug(string $slug): ?array
     {
         return Cache::remember("wp_api:category:{$slug}", self::CATEGORY_CACHE_TTL_SECONDS, function () use ($slug) {
-            $response = $this->http()->get("{$this->baseUrl}/categories", [
-                'slug' => $slug,
-            ]);
+            $response = $this->safeGet("{$this->baseUrl}/categories", ['slug' => $slug]);
 
-            if ($response->failed()) {
+            if (! $response || $response->failed()) {
                 return null;
             }
 
@@ -99,12 +102,9 @@ class WordPressApiClient implements WordPressRepository
     public function getPostBySlug(string $slug): ?array
     {
         return Cache::remember("wp_api:post:{$slug}", self::CACHE_TTL_SECONDS, function () use ($slug) {
-            $response = $this->http()->get("{$this->baseUrl}/posts", [
-                'slug' => $slug,
-                '_embed' => 'true',
-            ]);
+            $response = $this->safeGet("{$this->baseUrl}/posts", ['slug' => $slug, '_embed' => 'true']);
 
-            if ($response->failed()) {
+            if (! $response || $response->failed()) {
                 return null;
             }
 
@@ -117,11 +117,9 @@ class WordPressApiClient implements WordPressRepository
     public function getPostById(int $id): ?array
     {
         return Cache::remember("wp_api:post_id:{$id}", self::CACHE_TTL_SECONDS, function () use ($id) {
-            $response = $this->http()->get("{$this->baseUrl}/posts/{$id}", [
-                '_embed' => 'true',
-            ]);
+            $response = $this->safeGet("{$this->baseUrl}/posts/{$id}", ['_embed' => 'true']);
 
-            if ($response->failed()) {
+            if (! $response || $response->failed()) {
                 return null;
             }
 
@@ -135,11 +133,9 @@ class WordPressApiClient implements WordPressRepository
         // static legal page changes far less often than a post, no need
         // for the shorter post-cache TTL.
         return Cache::remember("wp_api:page:{$slug}", self::CATEGORY_CACHE_TTL_SECONDS, function () use ($slug) {
-            $response = $this->http()->get("{$this->baseUrl}/pages", [
-                'slug' => $slug,
-            ]);
+            $response = $this->safeGet("{$this->baseUrl}/pages", ['slug' => $slug]);
 
-            if ($response->failed()) {
+            if (! $response || $response->failed()) {
                 return null;
             }
 
@@ -162,7 +158,7 @@ class WordPressApiClient implements WordPressRepository
             $totalPages = 1;
 
             do {
-                $response = $this->http()->get("{$this->baseUrl}/categories", [
+                $response = $this->safeGet("{$this->baseUrl}/categories", [
                     'per_page' => 100,
                     'hide_empty' => 'true',
                     'orderby' => 'name',
@@ -170,7 +166,7 @@ class WordPressApiClient implements WordPressRepository
                     'page' => $page,
                 ]);
 
-                if ($response->failed()) {
+                if (! $response || $response->failed()) {
                     break;
                 }
 
@@ -183,21 +179,42 @@ class WordPressApiClient implements WordPressRepository
         });
     }
 
+    /**
+     * Resolved from the one already-cached getAllCategories() call rather
+     * than a separate getCategoryBySlug() round-trip per slug - this used
+     * to be 3 extra sequential WordPress calls on every cold-cache
+     * homepage render (one per VIDEO_CATEGORY_SLUGS entry), each paying
+     * the full connect/request timeout if WordPress was slow that
+     * moment. A real, measured production incident: with WordPress
+     * unreachable, a single homepage render (this call plus
+     * HomeController's other category lookups) took 146 SECONDS to
+     * finally degrade to empty sections - "every navigation takes
+     * forever" wasn't an exaggeration, it was every one of these
+     * redundant sequential lookups each waiting out its own timeout in
+     * turn. getAllCategories() is called for the nav on every single page
+     * already (HandleInertiaRequests), so by the time this runs it's
+     * almost always a free cache hit, not a new round-trip.
+     */
     public function getVideoSourcePosts(int $perPage = 20): array
     {
-        $categoryIds = [];
-        foreach (self::VIDEO_CATEGORY_SLUGS as $slug) {
-            $category = $this->getCategoryBySlug($slug);
-            if ($category) {
-                $categoryIds[] = $category['id'];
-            }
-        }
+        $categoryIds = $this->categoryIdsBySlug(self::VIDEO_CATEGORY_SLUGS);
 
         if (empty($categoryIds)) {
             return ['items' => [], 'meta' => ['totalItems' => 0, 'totalPages' => 0]];
         }
 
         return $this->getPosts(['categories' => implode(',', $categoryIds), 'per_page' => $perPage]);
+    }
+
+    /** @return array<int, int> the real category id for each slug that actually exists - unknown slugs are silently skipped. */
+    private function categoryIdsBySlug(array $slugs): array
+    {
+        $bySlug = [];
+        foreach ($this->getAllCategories() as $category) {
+            $bySlug[$category['slug']] = $category['id'];
+        }
+
+        return array_values(array_filter(array_map(fn ($slug) => $bySlug[$slug] ?? null, $slugs)));
     }
 
     public function getAllPostSlugsForSitemap(?callable $onPage = null): array
@@ -268,16 +285,54 @@ class WordPressApiClient implements WordPressRepository
      * handshake to a slow/unreachable host can hang a request indefinitely
      * instead of failing fast. Callers needing more (retry, a longer
      * request timeout for a heavy paginated loop) layer it on top.
+     *
+     * Tightened from connectTimeout(10)/timeout(15) - now that safeGet()
+     * degrades to an empty result instead of crashing (see its own
+     * docblock), there's no reason to make a real visitor wait out a long
+     * timeout hoping a slow WordPress eventually answers. Measured
+     * directly: a single homepage render made ~9 of these calls
+     * sequentially, so even the OLD timeout alone (ignoring the crash
+     * fix) meant a degraded WordPress could cost a visitor 90+ seconds on
+     * this budget alone before HomeController's own fixes reduced the
+     * call count. A healthy WordPress response normally takes well under
+     * a second; 3s/5s is still generous headroom above that.
      */
     private function http(): \Illuminate\Http\Client\PendingRequest
     {
-        return Http::acceptJson()->connectTimeout(10)->timeout(15);
+        return Http::acceptJson()->connectTimeout(3)->timeout(5);
+    }
+
+    /**
+     * Every GET in this class went through plain $this->http()->get(...)
+     * before - safe against a bad HTTP status (every caller already
+     * checks $response->failed()), but NOT against a genuine connection
+     * failure (WordPress unreachable, DNS failure, the connect/request
+     * timeout above actually firing), which Laravel's HTTP client throws
+     * as ConnectionException regardless of status-code handling. That
+     * exception was never caught anywhere in this class, so it propagated
+     * straight out of Cache::remember()'s closure and crashed whatever
+     * page/controller called in - a real, confirmed production pattern:
+     * ANY WordPress hiccup (not an outage, just a slow moment) 500'd the
+     * entire site, every page, since nearly every page fetches posts or
+     * categories from here. Centralizing the catch here means every
+     * existing and future caller gets this protection automatically,
+     * rather than needing to remember it per call site.
+     */
+    private function safeGet(string $url, array $query = []): ?Response
+    {
+        try {
+            return $this->http()->get($url, $query);
+        } catch (ConnectionException $e) {
+            Log::warning('WordPressApiClient: connection failed', ['url' => $url, 'error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     /** @return array{items: array<int, array<string, mixed>>, meta: array{totalItems: int, totalPages: int}} */
-    private function toCollection(Response $response): array
+    private function toCollection(?Response $response): array
     {
-        if ($response->failed()) {
+        if (! $response || $response->failed()) {
             return ['items' => [], 'meta' => ['totalItems' => 0, 'totalPages' => 0]];
         }
 

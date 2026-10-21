@@ -38,6 +38,13 @@ type PlayerStatus = 'idle' | 'connecting' | 'playing' | 'error';
 // recover (onPlaying firing again cancels it) before treating it as real.
 const STALL_GRACE_MS = 20000;
 
+// A dropped live connection is retried with a fresh request to the stream
+// URL, with growing waits, instead of ending playback. Gives up after this
+// many consecutive failed attempts - mirrors the mobile app's auto-reconnect.
+const RECONNECT_MAX_ATTEMPTS = 8;
+const RECONNECT_BASE_DELAY_MS = 1500;
+const RECONNECT_MAX_DELAY_MS = 15000;
+
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -265,6 +272,9 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   const sessionTokenRef = useRef<string | null>(null);
   const pollHandleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stallTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wantPlayingRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [listenerCount, setListenerCount] = useState<number | null>(null);
   const [confirmingVideoSwitch, setConfirmingVideoSwitch] = useState(false);
 
@@ -311,15 +321,56 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
     }
   }
 
-  // Only reached if a stall never recovers within STALL_GRACE_MS - now
-  // treated as a real disconnect: pause the element for real (so the
-  // audio can't keep quietly playing/buffering against a UI that says
-  // it's stopped) and end the tracked session.
-  function handleStallTimeout() {
-    stallTimeoutRef.current = null;
+  function clearReconnectTimer() {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }
+
+  // The listener's session stays open across reconnects - only a real
+  // give-up or an explicit pause ends it.
+  function giveUpOnStream() {
+    wantPlayingRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    clearReconnectTimer();
     audioRef.current?.pause();
     setStatus('error');
     reportListenStop();
+  }
+
+  // A dropped live connection is retried with a fresh request to the
+  // stream URL. Only applies while the listener actually wants audio -
+  // a deliberate pause never reconnects.
+  function handleStreamLost() {
+    if (!wantPlayingRef.current) return;
+    clearStallTimeout();
+    clearReconnectTimer();
+    if (reconnectAttemptsRef.current >= RECONNECT_MAX_ATTEMPTS) {
+      giveUpOnStream();
+      return;
+    }
+    reconnectAttemptsRef.current += 1;
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY_MS * 2 ** (reconnectAttemptsRef.current - 1),
+      RECONNECT_MAX_DELAY_MS
+    );
+    setStatus('connecting');
+    reconnectTimerRef.current = setTimeout(reconnectNow, delay);
+  }
+
+  async function reconnectNow() {
+    reconnectTimerRef.current = null;
+    if (!audioRef.current || !wantPlayingRef.current) return;
+    audioRef.current.load();
+    const ok = await requestPlay(LIVE_STREAM_ID, audioRef.current);
+    if (!ok) handleStreamLost();
+  }
+
+  // Only reached if a stall never recovers within STALL_GRACE_MS.
+  function handleStallTimeout() {
+    stallTimeoutRef.current = null;
+    handleStreamLost();
   }
 
   function handleStalled() {
@@ -341,6 +392,8 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
         if (sessionTokenRef.current !== token) return;
         stopStatusPoll();
         sessionTokenRef.current = null;
+        wantPlayingRef.current = false;
+        clearReconnectTimer();
         audioRef.current?.pause();
         notifyStop(LIVE_STREAM_ID);
         setStatus('idle');
@@ -418,15 +471,22 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
       handleUnload();
       stopStatusPoll();
       clearStallTimeout();
+      clearReconnectTimer();
     };
   }, []);
 
   async function startPlayback() {
     if (!audioRef.current) return;
+    wantPlayingRef.current = true;
+    reconnectAttemptsRef.current = 0;
+    clearReconnectTimer();
     setStatus('connecting');
     audioRef.current.load();
     const ok = await requestPlay(LIVE_STREAM_ID, audioRef.current);
-    if (!ok) setStatus('error');
+    if (!ok) {
+      wantPlayingRef.current = false;
+      setStatus('error');
+    }
   }
 
   // Asymmetric on purpose (explicit product decision): switching FROM
@@ -453,6 +513,8 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
   }
 
   function pause() {
+    wantPlayingRef.current = false;
+    clearReconnectTimer();
     clearStallTimeout();
     audioRef.current?.pause();
     notifyStop(LIVE_STREAM_ID);
@@ -497,11 +559,21 @@ export function RadioPlayer({ compact = false }: RadioPlayerProps) {
           ref={audioRef}
           src={STREAM_URL}
           preload="none"
-          onPlaying={() => { clearStallTimeout(); setStatus('playing'); reportListenStart(); }}
+          onPlaying={() => {
+            clearStallTimeout();
+            clearReconnectTimer();
+            reconnectAttemptsRef.current = 0;
+            setStatus('playing');
+            reportListenStart();
+          }}
           onWaiting={() => setStatus('connecting')}
           onStalled={handleStalled}
-          onError={() => { clearStallTimeout(); setStatus('error'); reportListenStop(); }}
-          onPause={() => { clearStallTimeout(); setStatus((s) => (s === 'error' ? s : 'idle')); }}
+          onError={() => { clearStallTimeout(); handleStreamLost(); }}
+          onPause={() => {
+            clearStallTimeout();
+            if (wantPlayingRef.current) return;
+            setStatus((s) => (s === 'error' ? s : 'idle'));
+          }}
         />
       )}
 

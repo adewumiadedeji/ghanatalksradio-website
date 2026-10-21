@@ -78,6 +78,27 @@ class PortalApiClientTest extends TestCase
         $this->assertSame([], (new PortalApiClient)->fetchPromoMessages());
     }
 
+    public function test_mirror_image_returns_the_mirrored_url_on_success(): void
+    {
+        Http::fake([
+            'portal.test/*' => Http::response(['status' => true, 'data' => ['url' => 'https://storage.googleapis.com/bucket/social-og-images/abc.jpg']], 200),
+        ]);
+
+        $this->assertSame(
+            'https://storage.googleapis.com/bucket/social-og-images/abc.jpg',
+            (new PortalApiClient)->mirrorImage('https://wordpress.ghanatalksradio.com/img.jpg')
+        );
+    }
+
+    public function test_mirror_image_fails_soft_to_null_on_failure(): void
+    {
+        Http::fake([
+            'portal.test/*' => Http::response('Internal Server Error', 500),
+        ]);
+
+        $this->assertNull((new PortalApiClient)->mirrorImage('https://wordpress.ghanatalksradio.com/img.jpg'));
+    }
+
     public function test_fetch_active_raffles_returns_data_on_success(): void
     {
         Http::fake([
@@ -184,5 +205,115 @@ class PortalApiClientTest extends TestCase
         $job = (new PortalApiClient)->getJobDetail('jooble', '123');
 
         $this->assertSame('Radio Presenter', $job['title']);
+    }
+
+    // --- poolGet() / fetchHomepagePortalData() -----------------------------
+
+    /**
+     * Covers a real, measured production incident: HomeController used to
+     * call fetchBanners() x5, fetchEngagementBanners(), getPodcastEpisodes()
+     * and fetchYoutubeVideos() SEQUENTIALLY - 8 portal round-trips, one
+     * after another. With the portal slow/unreachable, each paid its own
+     * full connect/request timeout in turn, and these 8 calls alone were
+     * the dominant cost in a homepage render measured at 72+ seconds.
+     * poolGet() fires every uncached request in parallel instead.
+     */
+    public function test_pool_get_fetches_multiple_distinct_endpoints_in_parallel(): void
+    {
+        Http::fake([
+            'portal.test/api/one' => Http::response(['status' => true, 'data' => ['value' => 'one']]),
+            'portal.test/api/two' => Http::response(['status' => true, 'data' => ['value' => 'two']]),
+        ]);
+
+        $results = (new PortalApiClient)->poolGet([
+            'first' => ['path' => '/api/one'],
+            'second' => ['path' => '/api/two'],
+        ]);
+
+        $this->assertSame(['value' => 'one'], $results['first']);
+        $this->assertSame(['value' => 'two'], $results['second']);
+    }
+
+    public function test_pool_get_skips_an_already_cached_request_and_only_pools_the_rest(): void
+    {
+        Http::fake([
+            'portal.test/api/one' => Http::response(['status' => true, 'data' => ['value' => 'fresh']]),
+            'portal.test/api/two' => Http::response('Should never be called', 500),
+        ]);
+
+        \Illuminate\Support\Facades\Cache::put('portal_api:/api/two?', ['status' => true, 'data' => ['value' => 'already-cached']], 60);
+
+        $results = (new PortalApiClient)->poolGet([
+            'first' => ['path' => '/api/one'],
+            'second' => ['path' => '/api/two'],
+        ]);
+
+        $this->assertSame(['value' => 'fresh'], $results['first']);
+        $this->assertSame(['value' => 'already-cached'], $results['second']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_pool_get_returns_null_for_a_failed_request_without_throwing_or_failing_the_rest(): void
+    {
+        Http::fake([
+            'portal.test/api/good' => Http::response(['status' => true, 'data' => ['value' => 'ok']]),
+            'portal.test/api/bad' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timed out'),
+        ]);
+
+        $results = (new PortalApiClient)->poolGet([
+            'good' => ['path' => '/api/good'],
+            'bad' => ['path' => '/api/bad'],
+        ]);
+
+        $this->assertSame(['value' => 'ok'], $results['good']);
+        $this->assertNull($results['bad']);
+    }
+
+    public function test_fetch_homepage_portal_data_maps_every_field_to_the_same_shape_the_individual_methods_used_to(): void
+    {
+        Http::fake([
+            'portal.test/api/advertising/banners*' => Http::response(['status' => true, 'data' => ['banners' => [['campaign_id' => 1]]]]),
+            'portal.test/api/engagement-banners' => Http::response(['status' => true, 'data' => ['banners' => [['campaign_id' => 2]]]]),
+            'portal.test/api/podcasts/episodes/*' => Http::response(['status' => true, 'data' => [
+                'episodes' => [[
+                    'episode' => ['slug' => 'ep-1', 'title' => 'Episode One', 'audio_url' => 'https://cdn.test/ep1.mp3'],
+                    'series' => ['slug' => 'the-show', 'name' => 'The Show'],
+                ]],
+                'page' => 1,
+                'has_more' => true,
+            ]]),
+            'portal.test/api/youtube/videos' => Http::response(['status' => true, 'data' => [
+                'live' => [],
+                'videos' => [['id' => 'yt-1'], ['id' => 'yt-2']],
+            ]]),
+        ]);
+
+        $data = (new PortalApiClient)->fetchHomepagePortalData(1);
+
+        $this->assertSame([['campaign_id' => 1]], $data['banners']);
+        $this->assertSame([['campaign_id' => 1]], $data['secondaryBanners']);
+        $this->assertSame([['campaign_id' => 2]], $data['engagementBanners']);
+        $this->assertSame('Episode One', $data['podcast']['episodes'][0]['title']);
+        $this->assertSame('the-show-ep-1', $data['podcast']['episodes'][0]['id']);
+        $this->assertTrue($data['podcast']['hasMore']);
+        $this->assertCount(2, $data['youtubeVideos']);
+        $this->assertFalse($data['youtubeError']);
+    }
+
+    public function test_fetch_homepage_portal_data_degrades_every_field_safely_when_the_portal_is_unreachable(): void
+    {
+        Http::fake(['portal.test/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timed out')]);
+
+        $data = (new PortalApiClient)->fetchHomepagePortalData(1);
+
+        $this->assertSame([], $data['banners']);
+        $this->assertSame([], $data['secondaryBanners']);
+        $this->assertSame([], $data['houseHorizontalBanners']);
+        $this->assertSame([], $data['houseVerticalBanners']);
+        $this->assertSame([], $data['houseSquareBanners']);
+        $this->assertSame([], $data['engagementBanners']);
+        $this->assertSame(['episodes' => [], 'page' => 1, 'hasMore' => false], $data['podcast']);
+        $this->assertSame([], $data['youtubeVideos']);
+        $this->assertTrue($data['youtubeError']);
     }
 }

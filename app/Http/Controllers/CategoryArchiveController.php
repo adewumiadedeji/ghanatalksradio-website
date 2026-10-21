@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\WordPress\Contracts\WordPressRepository;
 use App\Support\BotDetector;
 use App\Support\BotNav;
+use App\Support\CategoryTree;
 use App\Support\PageMeta;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -43,7 +44,18 @@ class CategoryArchiveController extends Controller
             ])->toResponse($request)->setStatusCode(404);
         }
 
-        $result = $wp->getPostsByCategory($category['id'], [
+        // This category's own posts PLUS every descendant (sub)category's
+        // posts - a category archive page must show "everything filed
+        // under News", not just whatever got tagged to the literal "news"
+        // term. Without this, a post an editor filed under a News
+        // subcategory (e.g. "Education") instead of the parent term was
+        // invisible here, which is exactly why /category/news could look
+        // stale for months while the site kept publishing - the new
+        // content was landing in a subcategory this page never queried.
+        $descendantIds = CategoryTree::descendantIds($wp->getAllCategories(), $category['id']);
+        $categoryIds = array_merge([$category['id']], $descendantIds);
+
+        $result = $wp->getPostsByCategory($categoryIds, [
             'page' => $page,
             'per_page' => self::PER_PAGE,
         ]);

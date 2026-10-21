@@ -5,6 +5,7 @@ namespace App\Services\WordPress;
 use App\Services\WordPress\Contracts\WordPressRepository;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Direct read-only access to WordPress's own MySQL tables, on the
@@ -41,13 +42,21 @@ class WordPressDbClient implements WordPressRepository
         $perPage = max(1, (int) ($params['per_page'] ?? 10));
         $page = max(1, (int) ($params['page'] ?? 1));
 
-        $query = $this->buildPostsQuery($params);
+        try {
+            $query = $this->buildPostsQuery($params);
 
-        $totalItems = (clone $query)->count('posts.ID');
-        $rows = $query->orderBy('post_date', 'desc')->forPage($page, $perPage)->get();
+            $totalItems = (clone $query)->count('posts.ID');
+            $rows = $query->orderBy('post_date', 'desc')->forPage($page, $perPage)->get();
+
+            $items = $this->hydratePosts($rows);
+        } catch (\Throwable $e) {
+            $this->logFailure('getPosts', $e);
+
+            return ['items' => [], 'meta' => ['totalItems' => 0, 'totalPages' => 0]];
+        }
 
         return [
-            'items' => $this->hydratePosts($rows),
+            'items' => $items,
             'meta' => [
                 'totalItems' => $totalItems,
                 'totalPages' => (int) ceil($totalItems / $perPage),
@@ -55,54 +64,72 @@ class WordPressDbClient implements WordPressRepository
         ];
     }
 
-    public function getPostsByCategory(int $categoryId, array $params = []): array
+    public function getPostsByCategory(int|array $categoryId, array $params = []): array
     {
         return $this->getPosts(array_merge($params, ['categories' => $categoryId]));
     }
 
     public function getPostBySlug(string $slug): ?array
     {
-        $row = DB::connection(self::CONNECTION)->table('posts')
-            ->where('post_type', 'post')
-            ->where('post_status', 'publish')
-            ->where('post_name', $slug)
-            ->first();
+        try {
+            $row = DB::connection(self::CONNECTION)->table('posts')
+                ->where('post_type', 'post')
+                ->where('post_status', 'publish')
+                ->where('post_name', $slug)
+                ->first();
 
-        if (! $row) {
+            if (! $row) {
+                return null;
+            }
+
+            return $this->hydratePosts(collect([$row]))[0] ?? null;
+        } catch (\Throwable $e) {
+            $this->logFailure('getPostBySlug', $e);
+
             return null;
         }
-
-        return $this->hydratePosts(collect([$row]))[0] ?? null;
     }
 
     public function getPostById(int $id): ?array
     {
-        $row = DB::connection(self::CONNECTION)->table('posts')
-            ->where('post_type', 'post')
-            ->where('post_status', 'publish')
-            ->where('ID', $id)
-            ->first();
+        try {
+            $row = DB::connection(self::CONNECTION)->table('posts')
+                ->where('post_type', 'post')
+                ->where('post_status', 'publish')
+                ->where('ID', $id)
+                ->first();
 
-        if (! $row) {
+            if (! $row) {
+                return null;
+            }
+
+            return $this->hydratePosts(collect([$row]))[0] ?? null;
+        } catch (\Throwable $e) {
+            $this->logFailure('getPostById', $e);
+
             return null;
         }
-
-        return $this->hydratePosts(collect([$row]))[0] ?? null;
     }
 
     public function getPageBySlug(string $slug): ?array
     {
-        $row = DB::connection(self::CONNECTION)->table('posts')
-            ->where('post_type', 'page')
-            ->where('post_status', 'publish')
-            ->where('post_name', $slug)
-            ->first();
+        try {
+            $row = DB::connection(self::CONNECTION)->table('posts')
+                ->where('post_type', 'page')
+                ->where('post_status', 'publish')
+                ->where('post_name', $slug)
+                ->first();
 
-        if (! $row) {
+            if (! $row) {
+                return null;
+            }
+
+            return $this->hydratePosts(collect([$row]))[0] ?? null;
+        } catch (\Throwable $e) {
+            $this->logFailure('getPageBySlug', $e);
+
             return null;
         }
-
-        return $this->hydratePosts(collect([$row]))[0] ?? null;
     }
 
     public function searchPosts(string $query, array $params = []): array
@@ -112,32 +139,57 @@ class WordPressDbClient implements WordPressRepository
 
     public function getAllCategories(): array
     {
-        $rows = DB::connection(self::CONNECTION)->table('terms')
-            ->join('term_taxonomy', 'term_taxonomy.term_id', '=', 'terms.term_id')
-            ->where('term_taxonomy.taxonomy', 'category')
-            ->where('term_taxonomy.count', '>', 0)
-            ->orderBy('terms.name', 'asc')
-            ->select('terms.term_id', 'terms.name', 'terms.slug', 'term_taxonomy.description', 'term_taxonomy.parent', 'term_taxonomy.count')
-            ->get();
+        try {
+            $rows = DB::connection(self::CONNECTION)->table('terms')
+                ->join('term_taxonomy', 'term_taxonomy.term_id', '=', 'terms.term_id')
+                ->where('term_taxonomy.taxonomy', 'category')
+                ->where('term_taxonomy.count', '>', 0)
+                ->orderBy('terms.name', 'asc')
+                ->select('terms.term_id', 'terms.name', 'terms.slug', 'term_taxonomy.description', 'term_taxonomy.parent', 'term_taxonomy.count')
+                ->get();
 
-        return $rows->map(fn ($row) => $this->formatTerm($row, 'category'))->all();
+            return $rows->map(fn ($row) => $this->formatTerm($row, 'category'))->all();
+        } catch (\Throwable $e) {
+            // Every page's nav depends on this - a DB hiccup here must
+            // degrade to "no nav categories this request" (NavResolver
+            // already handles an empty list fine, see its own docblock),
+            // never take the whole page down with it.
+            $this->logFailure('getAllCategories', $e);
+
+            return [];
+        }
     }
 
+    /**
+     * Resolved from one getAllCategories() call rather than a separate
+     * query per slug - see WordPressApiClient::getVideoSourcePosts()'s
+     * identical change for the full reasoning (a measured 146s worst-case
+     * homepage render driven by redundant sequential lookups). Matters
+     * less here than on the HTTP-backed client (a local DB round-trip is
+     * far cheaper than a network one), but kept symmetric with the other
+     * WordPressRepository implementation, and still cuts real queries
+     * under DB load/contention.
+     */
     public function getVideoSourcePosts(int $perPage = 20): array
     {
-        $categoryIds = [];
-        foreach (self::VIDEO_CATEGORY_SLUGS as $slug) {
-            $category = $this->getCategoryBySlug($slug);
-            if ($category) {
-                $categoryIds[] = $category['id'];
-            }
-        }
+        $categoryIds = $this->categoryIdsBySlug(self::VIDEO_CATEGORY_SLUGS);
 
         if (empty($categoryIds)) {
             return ['items' => [], 'meta' => ['totalItems' => 0, 'totalPages' => 0]];
         }
 
         return $this->getPosts(['categories' => $categoryIds, 'per_page' => $perPage]);
+    }
+
+    /** @return array<int, int> the real category id for each slug that actually exists - unknown slugs are silently skipped. */
+    private function categoryIdsBySlug(array $slugs): array
+    {
+        $bySlug = [];
+        foreach ($this->getAllCategories() as $category) {
+            $bySlug[$category['slug']] = $category['id'];
+        }
+
+        return array_values(array_filter(array_map(fn ($slug) => $bySlug[$slug] ?? null, $slugs)));
     }
 
     public function getAllPostSlugsForSitemap(?callable $onPage = null): array
@@ -196,18 +248,24 @@ class WordPressDbClient implements WordPressRepository
 
     public function getCategoryBySlug(string $slug): ?array
     {
-        $row = DB::connection(self::CONNECTION)->table('terms')
-            ->join('term_taxonomy', 'term_taxonomy.term_id', '=', 'terms.term_id')
-            ->where('term_taxonomy.taxonomy', 'category')
-            ->where('terms.slug', $slug)
-            ->select('terms.term_id', 'terms.name', 'terms.slug', 'term_taxonomy.description', 'term_taxonomy.parent', 'term_taxonomy.count')
-            ->first();
+        try {
+            $row = DB::connection(self::CONNECTION)->table('terms')
+                ->join('term_taxonomy', 'term_taxonomy.term_id', '=', 'terms.term_id')
+                ->where('term_taxonomy.taxonomy', 'category')
+                ->where('terms.slug', $slug)
+                ->select('terms.term_id', 'terms.name', 'terms.slug', 'term_taxonomy.description', 'term_taxonomy.parent', 'term_taxonomy.count')
+                ->first();
 
-        if (! $row) {
+            if (! $row) {
+                return null;
+            }
+
+            return $this->formatTerm($row, 'category');
+        } catch (\Throwable $e) {
+            $this->logFailure('getCategoryBySlug', $e);
+
             return null;
         }
-
-        return $this->formatTerm($row, 'category');
     }
 
     public function getPostsByCategorySlug(string $slug, array $params = []): array
@@ -455,5 +513,22 @@ class WordPressDbClient implements WordPressRepository
         $plain = trim(strip_tags($content));
 
         return implode(' ', array_slice(preg_split('/\s+/', $plain), 0, $words));
+    }
+
+    /**
+     * No query in this class caught a DB-level failure before - a slow or
+     * unreachable 'wordpress' connection (see config/database.php's own
+     * comment: no PDO connect timeout was ever set on it) threw an
+     * uncaught QueryException/PDOException straight out of whichever
+     * public method was running, crashing the ENTIRE page that called it
+     * - and since nearly every page fetches posts or categories from
+     * here, a single slow moment on WordPress's database took down the
+     * whole site, repeatedly. Every public method here now catches that
+     * and degrades to an empty result instead - logged so it's still
+     * visible, never silent.
+     */
+    private function logFailure(string $method, \Throwable $e): void
+    {
+        Log::warning("WordPressDbClient::{$method} failed", ['error' => $e->getMessage()]);
     }
 }

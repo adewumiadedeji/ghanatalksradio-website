@@ -86,6 +86,18 @@ return [
             'prefix_indexes' => true,
             'strict' => false, // older WordPress installs can hold data SQL strict mode would reject on read
             'engine' => null,
+            // No connect timeout was ever set here, unlike every HTTP
+            // client call elsewhere in this app (all explicitly bounded) -
+            // a slow/unreachable WordPress DB server could hang a PHP-FPM
+            // worker on the bare TCP/MySQL-handshake default (often 60s+)
+            // with zero application-level circuit breaker. This only
+            // bounds the CONNECT phase, not an in-flight query that's
+            // already connected but running slow (MySQL/PDO has no
+            // portable client-side query-execution timeout) - see
+            // WordPressDbClient's own try/catch for that remaining risk.
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                \PDO::ATTR_TIMEOUT => (int) env('WP_DB_CONNECT_TIMEOUT', 5),
+            ]) : [],
         ],
 
         'mariadb' => [

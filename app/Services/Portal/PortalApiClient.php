@@ -110,6 +110,53 @@ class PortalApiClient
     }
 
     /**
+     * Every survey platform row (live + "coming soon" placeholders) -
+     * GET /api/survey-platforms. Read-only, same as fetchActiveRaffles():
+     * taking a survey only happens in the app (see SurveyHub.tsx's own
+     * AppDownloadModal, mirroring Raffle.tsx exactly) - there is no real
+     * user_id/bearer-token identity on this web client to credit a
+     * reward balance to.
+     */
+    public function fetchSurveyPlatforms(): array
+    {
+        return $this->apiGet('/api/survey-platforms')['platforms'] ?? [];
+    }
+
+    /**
+     * A single survey platform's live/coming-soon state and (if live) its
+     * unpersonalized available-surveys list - GET
+     * /api/survey-platforms/{platform}. No bearer token is sent (this web
+     * client has no real login - see SurveyHub.tsx's own docblock), so
+     * this always reflects the anonymous view: audience-unrestricted
+     * ACTIVE surveys only, no "your responses" section.
+     */
+    public function fetchSurveyPlatformDetail(string $platformCode): ?array
+    {
+        try {
+            return $this->apiGet('/api/survey-platforms/'.$platformCode);
+        } catch (PortalApiException) {
+            return null;
+        }
+    }
+
+    /**
+     * A single native survey's public detail (title/description/reward,
+     * no questions needed here - this is the deep-link fallback landing
+     * page, not a take-survey form, see SurveyDetail.tsx's own docblock).
+     * GET /api/survey-platforms/native/{survey} - fully public, no bearer
+     * token, same endpoint the mobile app uses for the real take-survey
+     * screen.
+     */
+    public function fetchSurveyDetail(int $surveyId): ?array
+    {
+        try {
+            return $this->apiGet('/api/survey-platforms/native/'.$surveyId);
+        } catch (PortalApiException) {
+            return null;
+        }
+    }
+
+    /**
      * GTR Careers job search - GET /api/careers/jobs
      * (Modules\Careers\Http\Controllers\Api\CareersController). Every
      * job's apply_url in the response is already a GTR-owned redirect
@@ -257,6 +304,38 @@ class PortalApiClient
     }
 
     /**
+     * Mirrors a WordPress-hosted image onto the portal's public GCS
+     * bucket - GET /api/social/mirrored-image?url=... (Modules\Content's
+     * SocialImageMirrorController). Exists because
+     * wordpress.ghanatalksradio.com and this app share one IONOS
+     * hosting account's request-rate ceiling; see that controller's own
+     * docblock for the full story (a real, confirmed Facebook "Corrupted
+     * Image" report that traced back to an account-wide 429, not a
+     * broken file). Only ever called for a post's og:image - see
+     * SinglePostController::ogImage(), which also wraps this in its own
+     * long-lived cache so a given post only pays this round-trip once,
+     * not on every pageview. Fails soft (null) like fetchBanners() -
+     * a mirror failure should fall back to the raw WordPress URL, never
+     * break the page. Deliberately NOT `fast: true` - the very first
+     * mirror of a given image downloads it from WordPress and uploads it
+     * to GCS synchronously on the portal side, which can easily exceed
+     * the 4s fast budget (meant for calls that are already cheap/
+     * decorative, not a cold-cache file copy) - every later page view
+     * takes the portal's own `exists()` fast-path instead, so this slow
+     * path only ever runs once per post.
+     */
+    public function mirrorImage(string $wordPressImageUrl): ?string
+    {
+        try {
+            return $this->apiGet('/api/social/mirrored-image', ['url' => $wordPressImageUrl])['url'] ?? null;
+        } catch (PortalApiException $e) {
+            Log::warning('PortalApiClient::mirrorImage failed', ['url' => $wordPressImageUrl, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
      * Server-side port of src/api/youtube.ts - ghanatalksradio-portal's
      * YoutubeController, GET /api/youtube/videos. Live + recent uploads
      * for the channel.
@@ -276,6 +355,63 @@ class PortalApiClient
             'live' => $json['data']['live'] ?? [],
             'videos' => $json['data']['videos'] ?? [],
             'nextPageToken' => $json['data']['next_page_token'] ?? null,
+        ];
+    }
+
+    /**
+     * Everything HomeController's homepage render needs from the portal,
+     * fetched in ONE parallel batch via poolGet() instead of 8 sequential
+     * calls (fetchBanners() x5, fetchEngagementBanners(),
+     * getPodcastEpisodes(), fetchYoutubeVideos()) - see poolGet()'s own
+     * docblock for the measured incident this fixes. Applies the exact
+     * same shape/fallback each of those individual methods already
+     * returns, so this is a drop-in replacement for calling all of them -
+     * HomeController doesn't need any of its own logic to change.
+     *
+     * $podcastPage is passed straight through to the podcast-episodes
+     * path exactly as HomeController already calls getPodcastEpisodes() -
+     * not renamed to "count" here despite how HomeController's own
+     * PODCAST_COUNT constant reads, since changing what value actually
+     * gets sent is a separate, unrelated question from this method's own
+     * job (fetching in parallel, not changing what's fetched).
+     *
+     * @return array{banners: array, secondaryBanners: array, houseHorizontalBanners: array, houseVerticalBanners: array, houseSquareBanners: array, engagementBanners: array, podcast: array{episodes: array, page: int, hasMore: bool}, youtubeVideos: array, youtubeError: bool}
+     */
+    public function fetchHomepagePortalData(int $podcastPage): array
+    {
+        $raw = $this->poolGet([
+            'banners' => ['path' => '/api/advertising/banners', 'query' => ['placement' => 'web_home'], 'fast' => true],
+            'secondaryBanners' => ['path' => '/api/advertising/banners', 'query' => ['placement' => 'web_home_secondary'], 'fast' => true],
+            'houseHorizontalBanners' => ['path' => '/api/advertising/banners', 'query' => ['placement' => 'web_house_horizontal'], 'fast' => true],
+            'houseVerticalBanners' => ['path' => '/api/advertising/banners', 'query' => ['placement' => 'web_house_vertical'], 'fast' => true],
+            'houseSquareBanners' => ['path' => '/api/advertising/banners', 'query' => ['placement' => 'web_house_square'], 'fast' => true],
+            'engagementBanners' => ['path' => '/api/engagement-banners', 'fast' => true],
+            'podcast' => ['path' => "/api/podcasts/episodes/{$podcastPage}"],
+            'youtube' => ['path' => '/api/youtube/videos', 'fast' => true],
+        ]);
+
+        $podcastData = $raw['podcast'];
+        $podcast = $podcastData ? [
+            'episodes' => array_map(
+                fn ($item) => $this->toEpisode($item['episode'], $this->toShow($item['series'])),
+                $podcastData['episodes']
+            ),
+            'page' => $podcastData['page'],
+            'hasMore' => $podcastData['has_more'],
+        ] : ['episodes' => [], 'page' => 1, 'hasMore' => false];
+
+        $youtubeData = $raw['youtube'];
+
+        return [
+            'banners' => $raw['banners']['banners'] ?? [],
+            'secondaryBanners' => $raw['secondaryBanners']['banners'] ?? [],
+            'houseHorizontalBanners' => $raw['houseHorizontalBanners']['banners'] ?? [],
+            'houseVerticalBanners' => $raw['houseVerticalBanners']['banners'] ?? [],
+            'houseSquareBanners' => $raw['houseSquareBanners']['banners'] ?? [],
+            'engagementBanners' => $raw['engagementBanners']['banners'] ?? [],
+            'podcast' => $podcast,
+            'youtubeVideos' => $youtubeData['videos'] ?? [],
+            'youtubeError' => $youtubeData === null,
         ];
     }
 
@@ -358,9 +494,101 @@ class PortalApiClient
      * hold a worker for up to ~75s, and a few concurrent requests doing
      * that exhausts the whole pool.
      */
+    /**
+     * Fires every request that isn't already cached IN PARALLEL via
+     * Http::pool(), instead of HomeController calling fetchBanners() x5,
+     * fetchEngagementBanners(), getPodcastEpisodes() and
+     * fetchYoutubeVideos() one after another. A real, measured production
+     * incident: with the portal slow/unreachable, those 8 sequential
+     * calls alone (each paying its own connect/request timeout in turn)
+     * accounted for the majority of a homepage render that took 72+
+     * seconds to degrade to empty sections even AFTER the WordPress side
+     * was separately fixed for the same class of bug - pooling means the
+     * total wait is bounded by the SLOWEST single call, not the sum of
+     * all of them.
+     *
+     * Same cache keys as rawGet() (cacheKey() is shared), so a request
+     * already cached from an earlier sequential call is skipped here, and
+     * a result fetched here is available to a later sequential call too -
+     * the two paths are fully interchangeable, just different fetch
+     * strategies over the same cache.
+     *
+     * A pooled request's connection/timeout failure does NOT throw the
+     * way a single ->get() call does - Http::pool() returns the
+     * exception object itself in that slot instead, so each result needs
+     * its own check rather than a surrounding try/catch.
+     *
+     * @param  array<string, array{path: string, query?: array, fast?: bool}>  $requests  keyed by caller-chosen name
+     * @return array<string, array|null> same keys, each the decoded {data} payload, or null on a miss/failure (same contract as apiGet() throwing - caller decides the fallback)
+     */
+    public function poolGet(array $requests): array
+    {
+        $results = [];
+        $toFetch = [];
+
+        foreach ($requests as $key => $request) {
+            $query = $request['query'] ?? [];
+            $cacheKey = $this->cacheKey($request['path'], $query);
+            $cached = Cache::get($cacheKey);
+
+            if ($cached !== null) {
+                $results[$key] = $this->extractData($cached);
+            } else {
+                $toFetch[$key] = $request + ['query' => $query, 'cacheKey' => $cacheKey];
+            }
+        }
+
+        if ($toFetch === []) {
+            return $results;
+        }
+
+        $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($toFetch) {
+            foreach ($toFetch as $key => $request) {
+                $fast = $request['fast'] ?? false;
+                $pool->as($key)
+                    ->acceptJson()
+                    ->connectTimeout($fast ? 3 : 5)
+                    ->timeout($fast ? 4 : 8)
+                    ->get("{$this->portalUrl}{$request['path']}", $request['query']);
+            }
+        });
+
+        foreach ($toFetch as $key => $request) {
+            $response = $responses[$key] ?? null;
+
+            if (! $response instanceof \Illuminate\Http\Client\Response || $response->failed()) {
+                Log::warning('PortalApiClient::poolGet failed', ['key' => $key, 'path' => $request['path'], 'query' => $request['query']]);
+                $results[$key] = null;
+
+                continue;
+            }
+
+            $json = $response->json();
+            Cache::put($request['cacheKey'], $json, self::CACHE_TTL_SECONDS);
+            $results[$key] = $this->extractData($json);
+        }
+
+        return $results;
+    }
+
+    private function cacheKey(string $path, array $query): string
+    {
+        return 'portal_api:'.$path.'?'.http_build_query($query);
+    }
+
+    /** @return array|null the {data} payload, or null if the envelope indicates failure/an unexpected shape - same checks apiGet() throws on. */
+    private function extractData(?array $json): ?array
+    {
+        if (! $json || ($json['status'] ?? true) === false || ! array_key_exists('data', $json)) {
+            return null;
+        }
+
+        return $json['data'];
+    }
+
     private function rawGet(string $path, array $query = [], bool $fast = false): ?array
     {
-        $cacheKey = 'portal_api:'.$path.'?'.http_build_query($query);
+        $cacheKey = $this->cacheKey($path, $query);
 
         return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($path, $query, $fast) {
             try {

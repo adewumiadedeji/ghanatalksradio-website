@@ -15,8 +15,14 @@ interface WordPressRepository
     /** @return array{items: array<int, array<string, mixed>>, meta: array{totalItems: int, totalPages: int}} */
     public function getPosts(array $params = []): array;
 
-    /** @return array{items: array<int, array<string, mixed>>, meta: array{totalItems: int, totalPages: int}} */
-    public function getPostsByCategory(int $categoryId, array $params = []): array;
+    /**
+     * $categoryId accepts multiple IDs (an OR match across all of them) so
+     * a category archive page can include posts tagged to a child
+     * category - see App\Support\CategoryTree and CategoryArchiveController.
+     *
+     * @return array{items: array<int, array<string, mixed>>, meta: array{totalItems: int, totalPages: int}}
+     */
+    public function getPostsByCategory(int|array $categoryId, array $params = []): array;
 
     public function getCategoryBySlug(string $slug): ?array;
 

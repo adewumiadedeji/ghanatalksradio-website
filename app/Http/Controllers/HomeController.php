@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\Portal\PortalApiClient;
-use App\Services\Portal\PortalApiException;
 use App\Services\WordPress\Contracts\WordPressRepository;
 use App\Support\BotDetector;
 use App\Support\BotNav;
@@ -36,6 +35,29 @@ class HomeController extends Controller
 
     public function __invoke(WordPressRepository $wp, PortalApiClient $portal, Request $request): Response|HttpResponse
     {
+        // WordPress's OTHER numeric permalink fallback - /?p={id} - as
+        // opposed to the /{id}/ path form LegacyPostRedirectController
+        // already handles. Route::fallback() never sees this one: '/' with
+        // a query string still matches this real route, so the request
+        // never falls through - the homepage silently rendered 200 with
+        // its own canonical for every one of these instead of recovering
+        // the real article, which is exactly the "Google indexed a
+        // homepage-duplicate instead of the real post" pattern a Search
+        // Console Coverage export surfaced across potentially thousands of
+        // old ?p={id} URLs (every post WordPress ever published exposes
+        // one, regardless of whether pretty permalinks were ever on).
+        // Checked first, before any of this controller's real work, so a
+        // redirecting request never pays for the feed fetches below.
+        if ($request->filled('p') && ctype_digit((string) $request->query('p'))) {
+            $post = $wp->getPostById((int) $request->query('p'));
+
+            if ($post === null) {
+                abort(404);
+            }
+
+            return redirect("/post/{$post['slug']}", 301);
+        }
+
         // Explicit rather than relying on app.blade.php's fallback default -
         // once every other page sets its own PageMeta, this description
         // should genuinely only ever describe the homepage.
@@ -91,15 +113,39 @@ class HomeController extends Controller
             self::VIDEO_TEASER_COUNT
         );
 
-        $entertainmentPosts = $wp->getPostsByCategorySlug('entertainment', ['per_page' => self::RAIL_COUNT])['items'];
-        $sportsPosts = $wp->getPostsByCategorySlug('sports', ['per_page' => self::RAIL_COUNT])['items'];
-        $lifestylePosts = $wp->getPostsByCategorySlug('lifestyle', ['per_page' => self::LIFESTYLE_GRID_COUNT])['items'];
-        $podcast = $portal->getPodcastEpisodes(self::PODCAST_COUNT);
+        // Resolved from one getAllCategories() call (already cached for
+        // the nav on every page, see HandleInertiaRequests - almost
+        // always a free cache hit here, not a new round-trip) instead of
+        // 3 separate getPostsByCategorySlug() calls, each of which did
+        // its OWN redundant category-slug lookup internally. A real,
+        // measured production incident: with WordPress slow/unreachable,
+        // every one of these redundant sequential lookups waited out its
+        // own connect/request timeout in turn, taking a single homepage
+        // render up to 146 SECONDS to finally degrade to empty sections -
+        // "every navigation takes forever" was this, not an exaggeration.
+        $categoryIdsBySlug = [];
+        foreach ($wp->getAllCategories() as $category) {
+            $categoryIdsBySlug[$category['slug']] = $category['id'];
+        }
+
+        $entertainmentPosts = isset($categoryIdsBySlug['entertainment'])
+            ? $wp->getPostsByCategory($categoryIdsBySlug['entertainment'], ['per_page' => self::RAIL_COUNT])['items']
+            : [];
+        $sportsPosts = isset($categoryIdsBySlug['sports'])
+            ? $wp->getPostsByCategory($categoryIdsBySlug['sports'], ['per_page' => self::RAIL_COUNT])['items']
+            : [];
+        $lifestylePosts = isset($categoryIdsBySlug['lifestyle'])
+            ? $wp->getPostsByCategory($categoryIdsBySlug['lifestyle'], ['per_page' => self::LIFESTYLE_GRID_COUNT])['items']
+            : [];
 
         if (BotDetector::isBot($request)) {
-            // Skips the portal calls entirely below (youtube videos, ad
-            // banner) - the bot view doesn't render either, so no reason to
-            // spend an external request on them for every crawl.
+            // Skips every portal call below (banners, podcast, youtube) -
+            // the bot view doesn't render any of them, so no reason to
+            // spend external requests on them for every crawl. This used
+            // to fetch podcast episodes even for a bot (a pre-existing
+            // inconsistency with this comment's own stated intent) -
+            // moving the whole batch below this check actually delivers
+            // what the comment already promised.
             return response()->view('bot.home', [
                 'navGroups' => BotNav::groups($wp),
                 'heroPosts' => $heroPosts,
@@ -112,39 +158,41 @@ class HomeController extends Controller
             ]);
         }
 
-        try {
-            $youtubeVideos = array_slice(
-                $portal->fetchYoutubeVideos()['videos'],
-                0,
-                self::YOUTUBE_TEASER_COUNT
-            );
-            $youtubeError = false;
-        } catch (PortalApiException) {
-            $youtubeVideos = [];
-            $youtubeError = true;
-        }
+        // One parallel batch instead of 8 sequential portal calls
+        // (fetchBanners() x5, fetchEngagementBanners(),
+        // getPodcastEpisodes(), fetchYoutubeVideos()) - see
+        // PortalApiClient::fetchHomepagePortalData()'s own docblock for
+        // the measured incident this fixes (these 8 calls alone were the
+        // dominant cost in a homepage render that took 72+ seconds to
+        // degrade to empty sections when the portal was slow, even after
+        // the WordPress side was separately fixed for the same class of
+        // bug). Every field below is the exact same shape/fallback the
+        // individual methods already returned.
+        $portalData = $portal->fetchHomepagePortalData(self::PODCAST_COUNT);
+
+        $youtubeVideos = array_slice($portalData['youtubeVideos'], 0, self::YOUTUBE_TEASER_COUNT);
 
         return Inertia::render('Home', [
             // Full arrays, not [0] ?? null - more than one active
             // campaign/creative can legitimately target the same
             // placement at once, and SponsoredBanner.tsx rotates through
             // all of them instead of only ever showing one.
-            'banners' => $portal->fetchBanners('web_home'),
+            'banners' => $portalData['banners'],
             // Secondary, narrower strip for a 728x90-sized creative - the
             // main hero slot above now stretches full-width, so a
             // smaller/older creative belongs here instead of being
             // stretched blurry in that one - see PlacementKey::WebHomeSecondary.
-            'secondaryBanners' => $portal->fetchBanners('web_home_secondary'),
+            'secondaryBanners' => $portalData['secondaryBanners'],
             // GTR's own internal-program banners (raffle/prediction/quiz-
             // style self-promotion, but for any internal program) -
             // dedicated placements, deliberately never competing with the
             // advertiser banner above for the same slot. Named by shape,
             // not page - see PlacementKey's own docblock and where each
             // renders in Home.tsx.
-            'houseHorizontalBanners' => $portal->fetchBanners('web_house_horizontal'),
-            'houseVerticalBanners' => $portal->fetchBanners('web_house_vertical'),
-            'houseSquareBanners' => $portal->fetchBanners('web_house_square'),
-            'engagementBanners' => $portal->fetchEngagementBanners(),
+            'houseHorizontalBanners' => $portalData['houseHorizontalBanners'],
+            'houseVerticalBanners' => $portalData['houseVerticalBanners'],
+            'houseSquareBanners' => $portalData['houseSquareBanners'],
+            'engagementBanners' => $portalData['engagementBanners'],
             'heroPosts' => $heroPosts,
             'topGridPosts' => $topGridPosts,
             'trendingPosts' => $trendingPosts,
@@ -152,10 +200,10 @@ class HomeController extends Controller
             'entertainmentPosts' => $entertainmentPosts,
             'sportsPosts' => $sportsPosts,
             'lifestylePosts' => $lifestylePosts,
-            'podcasts' => $podcast,
+            'podcasts' => $portalData['podcast'],
             'videoPosts' => $videoPosts,
             'youtubeVideos' => $youtubeVideos,
-            'youtubeError' => $youtubeError,
+            'youtubeError' => $portalData['youtubeError'],
         ]);
     }
 }

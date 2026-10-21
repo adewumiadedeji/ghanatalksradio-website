@@ -280,6 +280,7 @@ export const ARENA_ITEMS: { label: string; to: string }[] = [
   { label: 'Raffle', to: '/raffle' },
   { label: 'Predictions', to: '/predictions' },
   { label: 'Quizzes', to: '/quizzes' },
+  { label: 'Surveys', to: '/surveys' },
   { label: 'Leaderboard', to: '/leaderboard' },
 ];
 
@@ -385,7 +386,7 @@ export function CategoryNav() {
       <PlaylistLink to="/jobs">Jobs</PlaylistLink>
       <ArenaDropdown />
       {/* <PlaylistLink to="/playlist">Playlist</PlaylistLink> */}
-      {/* <MoreDropdown items={overflow} /> */}
+      <MoreDropdown items={overflow} />
     </Nav>
   );
 }
